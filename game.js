@@ -1982,86 +1982,86 @@ function drawTitleScreen() {
 }
 
 function drawCitySkyline() {
-    const baseY = canvas.height * 0.82;
+    const t = animCache.time;
+    const cw = canvas.width;
+    const ch = canvas.height;
 
-    // Gradient sky behind buildings
-    const skyGrad = ctx.createLinearGradient(0, baseY - 200, 0, baseY);
-    skyGrad.addColorStop(0, '#0a0a1a');
-    skyGrad.addColorStop(1, '#151530');
-    ctx.fillStyle = skyGrad;
-    ctx.fillRect(0, baseY - 200, canvas.width, 200);
-
-    // Golden Gate hint (distant, behind buildings)
-    ctx.strokeStyle = '#c0402050';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(canvas.width * 0.0, baseY - 5);
-    ctx.lineTo(canvas.width * 0.12, baseY - 35);
-    ctx.lineTo(canvas.width * 0.24, baseY - 5);
-    ctx.stroke();
-
-    ctx.fillStyle = '#0d0d20';
-
-    // Shorter, wider buildings that sit at the bottom
-    const buildings = [
-        { x: 0.00, w: 0.07, h: 0.10 },
-        { x: 0.08, w: 0.05, h: 0.16 },
-        { x: 0.14, w: 0.08, h: 0.12 },
-        { x: 0.23, w: 0.06, h: 0.18 },
-        { x: 0.30, w: 0.07, h: 0.14 },
-        { x: 0.38, w: 0.05, h: 0.20 },
-        { x: 0.44, w: 0.08, h: 0.15 },
-        { x: 0.53, w: 0.06, h: 0.12 },
-        { x: 0.60, w: 0.07, h: 0.17 },
-        { x: 0.68, w: 0.05, h: 0.13 },
-        { x: 0.74, w: 0.08, h: 0.11 },
-        { x: 0.83, w: 0.06, h: 0.16 },
-        { x: 0.90, w: 0.05, h: 0.13 },
-        { x: 0.96, w: 0.05, h: 0.09 },
+    // Back row (distant, dimmer, taller)
+    const backBuildings = [
+        { x: 0.00, w: 0.08, h: 0.55 },
+        { x: 0.09, w: 0.06, h: 0.70 },
+        { x: 0.16, w: 0.09, h: 0.60 },
+        { x: 0.26, w: 0.07, h: 0.80 },
+        { x: 0.34, w: 0.08, h: 0.65 },
+        { x: 0.43, w: 0.06, h: 0.90 },  // Tallest - center
+        { x: 0.50, w: 0.09, h: 0.75 },
+        { x: 0.60, w: 0.07, h: 0.85 },
+        { x: 0.68, w: 0.08, h: 0.60 },
+        { x: 0.77, w: 0.06, h: 0.72 },
+        { x: 0.84, w: 0.09, h: 0.55 },
+        { x: 0.94, w: 0.07, h: 0.65 },
     ];
 
-    // Use seeded random for consistent blinking pattern per window
-    const t = animCache.time;
+    // Front row (closer, brighter, shorter)
+    const frontBuildings = [
+        { x: 0.02, w: 0.07, h: 0.35 },
+        { x: 0.10, w: 0.05, h: 0.45 },
+        { x: 0.16, w: 0.08, h: 0.38 },
+        { x: 0.25, w: 0.06, h: 0.50 },
+        { x: 0.32, w: 0.07, h: 0.42 },
+        { x: 0.40, w: 0.06, h: 0.55 },
+        { x: 0.47, w: 0.08, h: 0.48 },
+        { x: 0.56, w: 0.06, h: 0.40 },
+        { x: 0.63, w: 0.07, h: 0.52 },
+        { x: 0.71, w: 0.06, h: 0.38 },
+        { x: 0.78, w: 0.08, h: 0.44 },
+        { x: 0.87, w: 0.06, h: 0.36 },
+        { x: 0.94, w: 0.07, h: 0.42 },
+    ];
 
-    for (const b of buildings) {
-        const bx = b.x * canvas.width;
-        const bw = b.w * canvas.width;
-        const bh = b.h * canvas.height;
+    function drawBuildingRow(buildings, bodyColor, winAlpha, winGapX, winGapY, winW, winH) {
+        for (const b of buildings) {
+            const bx = b.x * cw;
+            const bw = b.w * cw;
+            const bh = b.h * ch;
+            const topY = ch - bh;
 
-        // Building body
-        ctx.fillStyle = '#0d0d20';
-        ctx.fillRect(bx, baseY - bh, bw, bh + canvas.height - baseY);
+            // Building body
+            ctx.fillStyle = bodyColor;
+            ctx.fillRect(bx, topY, bw, bh);
 
-        // Windows with blinking lights
-        const winW = 3;
-        const winH = 4;
-        const winGapX = 7;
-        const winGapY = 8;
+            // Windows with blinking lights
+            for (let wy = topY + 4; wy < ch - 3; wy += winGapY) {
+                for (let wx = bx + 3; wx < bx + bw - 3; wx += winGapX) {
+                    const seed = (Math.floor(wx) * 137 + Math.floor(wy) * 251) % 1000;
+                    const blinkRate = 0.08 + (seed % 60) / 60 * 0.35;
+                    const blinkPhase = seed / 1000 * Math.PI * 2;
+                    const blinkVal = Math.sin(t * blinkRate * Math.PI * 2 + blinkPhase);
 
-        for (let wy = baseY - bh + 5; wy < baseY - 3; wy += winGapY) {
-            for (let wx = bx + 3; wx < bx + bw - 3; wx += winGapX) {
-                // Each window has its own blink cycle based on position
-                const seed = (wx * 137 + wy * 251) % 1000;
-                const blinkRate = 0.1 + (seed % 50) / 50 * 0.4; // 0.1-0.5 Hz
-                const blinkPhase = seed / 1000 * Math.PI * 2;
-                const blinkVal = Math.sin(t * blinkRate * Math.PI * 2 + blinkPhase);
+                    const isBlinking = seed % 6 === 0;  // ~17% blink
+                    const isLit = isBlinking ? blinkVal > 0 : seed % 3 !== 0;
 
-                // Most windows stay lit, some blink on/off
-                const isBlinking = seed % 7 === 0; // ~14% of windows blink
-                const isLit = isBlinking ? blinkVal > 0 : seed % 3 !== 0; // 66% always on
-
-                if (isLit) {
-                    // Warm window colors
-                    const warmth = (seed % 3);
-                    ctx.fillStyle = warmth === 0 ? '#f0d06080' :
-                                    warmth === 1 ? '#e8c04070' : '#d0a03060';
-                } else {
-                    ctx.fillStyle = '#15153a';
+                    if (isLit) {
+                        const warmth = seed % 4;
+                        const a = winAlpha;
+                        ctx.fillStyle = warmth === 0 ? `rgba(240,208,96,${a})` :
+                                        warmth === 1 ? `rgba(232,192,64,${a * 0.85})` :
+                                        warmth === 2 ? `rgba(208,160,48,${a * 0.7})` :
+                                                       `rgba(255,220,120,${a * 0.9})`;
+                    } else {
+                        ctx.fillStyle = bodyColor === '#0d0d1e' ? '#12122a' : '#161636';
+                    }
+                    ctx.fillRect(wx, wy, winW, winH);
                 }
-                ctx.fillRect(wx, wy, winW, winH);
             }
         }
     }
+
+    // Draw back row (dimmer, smaller windows)
+    drawBuildingRow(backBuildings, '#0d0d1e', 0.3, 6, 7, 2, 3);
+
+    // Draw front row (brighter, larger windows)
+    drawBuildingRow(frontBuildings, '#10102a', 0.5, 7, 8, 3, 4);
 }
 
 // ============================================
