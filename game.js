@@ -1727,15 +1727,16 @@ function generateScoreText(stars) {
     const timeLeft = Math.floor(Math.max(0, gameState.timeBonus));
     const starStr = '\u2B50'.repeat(stars) + '\u2606'.repeat(3 - stars);
     const char = CHARACTERS[gameState.selectedCharacter];
+    const districtGrade = calculateDistrictGrade(pct, timeLeft);
 
-    let headline = getGradeHeadline(gameState.cityGrade);
+    let headline = getGradeHeadline(districtGrade);
     if (gameState.clutchFinish) headline = CLUTCH_HEADLINES[Math.floor(Math.random() * CLUTCH_HEADLINES.length)];
     else if (gameState.nearMiss) headline = NEAR_MISS_HEADLINES[Math.floor(Math.random() * NEAR_MISS_HEADLINES.length)];
 
     const lines = [
         `DOODY CALLS - D${district.id}: ${district.name}`,
         `${starStr} | Cleaned: ${pct}% | Time: ${timeLeft}s left`,
-        `Character: ${char.name} | Grade: ${gameState.cityGrade}`,
+        `${char.name} | Grade: ${districtGrade}`,
         `"${headline}"`,
         ``,
         `https://kingmadellc.github.io/DoodyCallsSF/`,
@@ -1952,6 +1953,17 @@ function calculateGrade(stars) {
     if (stars >= 12) return 'C+';
     if (stars >= 8) return 'C';
     if (stars >= 4) return 'D';
+    return 'F';
+}
+
+function calculateDistrictGrade(pct, timeLeft) {
+    if (pct >= 100 && timeLeft > 10) return 'A+';
+    if (pct >= 100) return 'A';
+    if (pct >= 90) return 'B+';
+    if (pct >= 80) return 'B';
+    if (pct >= 70) return 'C+';
+    if (pct >= 60) return 'C';
+    if (pct >= 40) return 'D';
     return 'F';
 }
 
@@ -3172,8 +3184,10 @@ function drawScoreShare(x, y, w, h, stars) {
     ctx.font = '9px monospace';
     const starStr = '\u2605'.repeat(stars) + '\u2606'.repeat(3 - stars);
     ctx.fillText(`DOODY CALLS - D${district.id}: ${district.name}`, x + 8, y + 30);
-    ctx.fillText(`${starStr} | Cleaned: ${pct}% | Time: ${Math.floor(gameState.timeBonus)}s left`, x + 8, y + 44);
-    ctx.fillText(`${char.name} | Grade: ${gameState.cityGrade}`, x + 8, y + 58);
+    const timeLeft = Math.floor(gameState.timeBonus);
+    ctx.fillText(`${starStr} | Cleaned: ${pct}% | Time: ${timeLeft}s left`, x + 8, y + 44);
+    const districtGrade = calculateDistrictGrade(pct, timeLeft);
+    ctx.fillText(`${char.name} | Grade: ${districtGrade}`, x + 8, y + 58);
 
     // Near-miss or clutch indicator
     if (gameState.clutchFinish) {
