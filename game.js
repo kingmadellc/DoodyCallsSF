@@ -1986,40 +1986,40 @@ function drawCitySkyline() {
     const cw = canvas.width;
     const ch = canvas.height;
 
-    // Back row (distant, dimmer, taller)
+    // Back row (distant, dimmer)
     const backBuildings = [
-        { x: 0.00, w: 0.08, h: 0.55 },
-        { x: 0.09, w: 0.06, h: 0.70 },
-        { x: 0.16, w: 0.09, h: 0.60 },
-        { x: 0.26, w: 0.07, h: 0.80 },
-        { x: 0.34, w: 0.08, h: 0.65 },
-        { x: 0.43, w: 0.06, h: 0.90 },  // Tallest - center
-        { x: 0.50, w: 0.09, h: 0.75 },
-        { x: 0.60, w: 0.07, h: 0.85 },
-        { x: 0.68, w: 0.08, h: 0.60 },
-        { x: 0.77, w: 0.06, h: 0.72 },
-        { x: 0.84, w: 0.09, h: 0.55 },
-        { x: 0.94, w: 0.07, h: 0.65 },
+        { x: 0.00, w: 0.08, h: 0.35 },
+        { x: 0.09, w: 0.06, h: 0.45 },
+        { x: 0.16, w: 0.09, h: 0.38 },
+        { x: 0.26, w: 0.07, h: 0.52 },
+        { x: 0.34, w: 0.08, h: 0.42 },
+        { x: 0.43, w: 0.06, h: 0.58 },  // Tallest - center
+        { x: 0.50, w: 0.09, h: 0.48 },
+        { x: 0.60, w: 0.07, h: 0.55 },
+        { x: 0.68, w: 0.08, h: 0.38 },
+        { x: 0.77, w: 0.06, h: 0.46 },
+        { x: 0.84, w: 0.09, h: 0.35 },
+        { x: 0.94, w: 0.07, h: 0.42 },
     ];
 
     // Front row (closer, brighter, shorter)
     const frontBuildings = [
-        { x: 0.02, w: 0.07, h: 0.35 },
-        { x: 0.10, w: 0.05, h: 0.45 },
-        { x: 0.16, w: 0.08, h: 0.38 },
-        { x: 0.25, w: 0.06, h: 0.50 },
-        { x: 0.32, w: 0.07, h: 0.42 },
-        { x: 0.40, w: 0.06, h: 0.55 },
-        { x: 0.47, w: 0.08, h: 0.48 },
-        { x: 0.56, w: 0.06, h: 0.40 },
-        { x: 0.63, w: 0.07, h: 0.52 },
-        { x: 0.71, w: 0.06, h: 0.38 },
-        { x: 0.78, w: 0.08, h: 0.44 },
-        { x: 0.87, w: 0.06, h: 0.36 },
-        { x: 0.94, w: 0.07, h: 0.42 },
+        { x: 0.02, w: 0.07, h: 0.22 },
+        { x: 0.10, w: 0.05, h: 0.30 },
+        { x: 0.16, w: 0.08, h: 0.25 },
+        { x: 0.25, w: 0.06, h: 0.33 },
+        { x: 0.32, w: 0.07, h: 0.28 },
+        { x: 0.40, w: 0.06, h: 0.36 },
+        { x: 0.47, w: 0.08, h: 0.32 },
+        { x: 0.56, w: 0.06, h: 0.26 },
+        { x: 0.63, w: 0.07, h: 0.34 },
+        { x: 0.71, w: 0.06, h: 0.25 },
+        { x: 0.78, w: 0.08, h: 0.29 },
+        { x: 0.87, w: 0.06, h: 0.23 },
+        { x: 0.94, w: 0.07, h: 0.28 },
     ];
 
-    function drawBuildingRow(buildings, bodyColor, winAlpha, winGapX, winGapY, winW, winH) {
+    function drawBuildingRow(buildings, bodyColor, winGapX, winGapY, winW, winH) {
         for (const b of buildings) {
             const bx = b.x * cw;
             const bw = b.w * cw;
@@ -2042,14 +2042,11 @@ function drawCitySkyline() {
                     const isLit = isBlinking ? blinkVal > 0 : seed % 3 !== 0;
 
                     if (isLit) {
-                        const warmth = seed % 4;
-                        const a = winAlpha;
-                        ctx.fillStyle = warmth === 0 ? `rgba(240,208,96,${a})` :
-                                        warmth === 1 ? `rgba(232,192,64,${a * 0.85})` :
-                                        warmth === 2 ? `rgba(208,160,48,${a * 0.7})` :
-                                                       `rgba(255,220,120,${a * 0.9})`;
+                        const warmth = seed % 3;
+                        ctx.fillStyle = warmth === 0 ? '#f0d06080' :
+                                        warmth === 1 ? '#e8c04070' : '#d0a03060';
                     } else {
-                        ctx.fillStyle = bodyColor === '#0d0d1e' ? '#12122a' : '#161636';
+                        ctx.fillStyle = '#1a1a3a';
                     }
                     ctx.fillRect(wx, wy, winW, winH);
                 }
@@ -2058,10 +2055,10 @@ function drawCitySkyline() {
     }
 
     // Draw back row (dimmer, smaller windows)
-    drawBuildingRow(backBuildings, '#0d0d1e', 0.3, 6, 7, 2, 3);
+    drawBuildingRow(backBuildings, '#0d0d1e', 6, 7, 2, 3);
 
     // Draw front row (brighter, larger windows)
-    drawBuildingRow(frontBuildings, '#10102a', 0.5, 7, 8, 3, 4);
+    drawBuildingRow(frontBuildings, '#10102a', 7, 8, 3, 4);
 }
 
 // ============================================
