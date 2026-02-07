@@ -317,6 +317,12 @@ const GAME_OVER_HEADLINES = [
 ];
 
 // ============================================
+// ASSETS
+// ============================================
+const wordmarkImg = new Image();
+wordmarkImg.src = 'assets/wordmark.png';
+
+// ============================================
 // GAME STATE
 // ============================================
 let gameState = {
@@ -1891,29 +1897,43 @@ function drawTitleScreen() {
     // City skyline silhouette
     drawCitySkyline();
 
-    // Title
-    const titleY = canvas.height * 0.22;
-    ctx.save();
+    // Wordmark logo
+    if (wordmarkImg.complete && wordmarkImg.naturalWidth > 0) {
+        const logoW = canvas.width * 0.55;
+        const logoH = logoW * (wordmarkImg.naturalHeight / wordmarkImg.naturalWidth);
+        const logoX = (canvas.width - logoW) / 2;
+        const logoY = canvas.height * 0.04;
+        ctx.drawImage(wordmarkImg, logoX, logoY, logoW, logoH);
 
-    // Title glow
-    ctx.shadowColor = '#ff6030';
-    ctx.shadowBlur = 30;
-    ctx.fillStyle = '#ff8040';
-    ctx.font = `bold ${Math.floor(canvas.width * 0.09)}px monospace`;
-    ctx.textAlign = 'center';
-    ctx.fillText('DOODY CALLS', canvas.width / 2, titleY);
-    ctx.shadowBlur = 0;
+        // Subtitle below logo
+        ctx.fillStyle = COLORS.uiAccent;
+        ctx.font = `${Math.floor(canvas.width * 0.028)}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('San Francisco Needs You.', canvas.width / 2, logoY + logoH + 8);
+    } else {
+        // Fallback text while loading
+        const titleY = canvas.height * 0.22;
+        ctx.fillStyle = '#ff8040';
+        ctx.font = `bold ${Math.floor(canvas.width * 0.09)}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('DOODY CALLS', canvas.width / 2, titleY);
 
-    // Subtitle
-    ctx.fillStyle = COLORS.uiAccent;
-    ctx.font = `${Math.floor(canvas.width * 0.028)}px monospace`;
-    ctx.fillText('San Francisco Needs You.', canvas.width / 2, titleY + 35);
+        ctx.fillStyle = COLORS.uiAccent;
+        ctx.font = `${Math.floor(canvas.width * 0.028)}px monospace`;
+        ctx.fillText('San Francisco Needs You.', canvas.width / 2, titleY + 35);
+    }
 
-    ctx.restore();
+    // Menu backdrop (dims skyline behind menu for readability)
+    const menuY = canvas.height * 0.52;
+    const menuSpacing = 50;
+    const backdropGrad = ctx.createLinearGradient(0, menuY - 30, 0, menuY + menuSpacing * 3 + 10);
+    backdropGrad.addColorStop(0, 'rgba(10,10,26,0)');
+    backdropGrad.addColorStop(0.15, 'rgba(10,10,26,0.7)');
+    backdropGrad.addColorStop(1, 'rgba(10,10,26,0.7)');
+    ctx.fillStyle = backdropGrad;
+    ctx.fillRect(0, menuY - 30, canvas.width, menuSpacing * 3 + 40);
 
     // Menu options
-    const menuY = canvas.height * 0.45;
-    const menuSpacing = 50;
     const menuItems = [
         { label: 'START SHIFT', desc: 'Begin District 1' },
         { label: 'QUICK SHIFT', desc: '3 random districts' },
@@ -1962,53 +1982,86 @@ function drawTitleScreen() {
 }
 
 function drawCitySkyline() {
-    const baseY = canvas.height * 0.35;
-    ctx.fillStyle = '#0a0a1a';
+    const baseY = canvas.height * 0.82;
 
-    // Random-ish buildings
+    // Gradient sky behind buildings
+    const skyGrad = ctx.createLinearGradient(0, baseY - 200, 0, baseY);
+    skyGrad.addColorStop(0, '#0a0a1a');
+    skyGrad.addColorStop(1, '#151530');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, baseY - 200, canvas.width, 200);
+
+    // Golden Gate hint (distant, behind buildings)
+    ctx.strokeStyle = '#c0402050';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(canvas.width * 0.0, baseY - 5);
+    ctx.lineTo(canvas.width * 0.12, baseY - 35);
+    ctx.lineTo(canvas.width * 0.24, baseY - 5);
+    ctx.stroke();
+
+    ctx.fillStyle = '#0d0d20';
+
+    // Shorter, wider buildings that sit at the bottom
     const buildings = [
-        { x: 0.05, w: 0.06, h: 0.15 },
-        { x: 0.12, w: 0.04, h: 0.22 },
-        { x: 0.17, w: 0.07, h: 0.18 },
-        { x: 0.26, w: 0.05, h: 0.25 },
-        { x: 0.32, w: 0.06, h: 0.20 },
-        { x: 0.40, w: 0.04, h: 0.30 }, // Transamerica-ish
-        { x: 0.45, w: 0.07, h: 0.22 },
-        { x: 0.54, w: 0.05, h: 0.18 },
-        { x: 0.60, w: 0.06, h: 0.24 },
-        { x: 0.68, w: 0.04, h: 0.20 },
-        { x: 0.74, w: 0.07, h: 0.16 },
-        { x: 0.82, w: 0.05, h: 0.22 },
-        { x: 0.88, w: 0.06, h: 0.19 },
-        { x: 0.95, w: 0.05, h: 0.14 },
+        { x: 0.00, w: 0.07, h: 0.10 },
+        { x: 0.08, w: 0.05, h: 0.16 },
+        { x: 0.14, w: 0.08, h: 0.12 },
+        { x: 0.23, w: 0.06, h: 0.18 },
+        { x: 0.30, w: 0.07, h: 0.14 },
+        { x: 0.38, w: 0.05, h: 0.20 },
+        { x: 0.44, w: 0.08, h: 0.15 },
+        { x: 0.53, w: 0.06, h: 0.12 },
+        { x: 0.60, w: 0.07, h: 0.17 },
+        { x: 0.68, w: 0.05, h: 0.13 },
+        { x: 0.74, w: 0.08, h: 0.11 },
+        { x: 0.83, w: 0.06, h: 0.16 },
+        { x: 0.90, w: 0.05, h: 0.13 },
+        { x: 0.96, w: 0.05, h: 0.09 },
     ];
+
+    // Use seeded random for consistent blinking pattern per window
+    const t = animCache.time;
 
     for (const b of buildings) {
         const bx = b.x * canvas.width;
         const bw = b.w * canvas.width;
         const bh = b.h * canvas.height;
-        ctx.fillRect(bx, baseY - bh, bw, bh + canvas.height);
 
-        // Windows
-        ctx.fillStyle = '#1a1a3a';
-        for (let wy = baseY - bh + 6; wy < baseY; wy += 12) {
-            for (let wx = bx + 4; wx < bx + bw - 4; wx += 8) {
-                const lit = Math.sin(wx * 3 + wy * 7 + animCache.time * 0.5) > 0.3;
-                ctx.fillStyle = lit ? '#f0d06040' : '#1a1a3a';
-                ctx.fillRect(wx, wy, 4, 6);
+        // Building body
+        ctx.fillStyle = '#0d0d20';
+        ctx.fillRect(bx, baseY - bh, bw, bh + canvas.height - baseY);
+
+        // Windows with blinking lights
+        const winW = 3;
+        const winH = 4;
+        const winGapX = 7;
+        const winGapY = 8;
+
+        for (let wy = baseY - bh + 5; wy < baseY - 3; wy += winGapY) {
+            for (let wx = bx + 3; wx < bx + bw - 3; wx += winGapX) {
+                // Each window has its own blink cycle based on position
+                const seed = (wx * 137 + wy * 251) % 1000;
+                const blinkRate = 0.1 + (seed % 50) / 50 * 0.4; // 0.1-0.5 Hz
+                const blinkPhase = seed / 1000 * Math.PI * 2;
+                const blinkVal = Math.sin(t * blinkRate * Math.PI * 2 + blinkPhase);
+
+                // Most windows stay lit, some blink on/off
+                const isBlinking = seed % 7 === 0; // ~14% of windows blink
+                const isLit = isBlinking ? blinkVal > 0 : seed % 3 !== 0; // 66% always on
+
+                if (isLit) {
+                    // Warm window colors
+                    const warmth = (seed % 3);
+                    ctx.fillStyle = warmth === 0 ? '#f0d06080' :
+                                    warmth === 1 ? '#e8c04070' : '#d0a03060';
+                } else {
+                    ctx.fillStyle = '#15153a';
+                }
+                ctx.fillRect(wx, wy, winW, winH);
             }
         }
-        ctx.fillStyle = '#0a0a1a';
     }
-
-    // Golden Gate hint (distant)
-    ctx.strokeStyle = '#c0402040';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(canvas.width * 0.0, baseY + 10);
-    ctx.lineTo(canvas.width * 0.15, baseY - 20);
-    ctx.lineTo(canvas.width * 0.30, baseY + 10);
-    ctx.stroke();
 }
 
 // ============================================
