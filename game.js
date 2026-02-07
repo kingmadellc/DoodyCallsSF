@@ -1986,37 +1986,38 @@ function drawCitySkyline() {
     const cw = canvas.width;
     const ch = canvas.height;
 
-    // Back row (distant, dimmer)
+    // Back row (distant, dimmer) - wide variety of widths and heights
     const backBuildings = [
-        { x: 0.00, w: 0.08, h: 0.35 },
-        { x: 0.09, w: 0.06, h: 0.45 },
-        { x: 0.16, w: 0.09, h: 0.38 },
-        { x: 0.26, w: 0.07, h: 0.52 },
-        { x: 0.34, w: 0.08, h: 0.42 },
-        { x: 0.43, w: 0.06, h: 0.58 },  // Tallest - center
-        { x: 0.50, w: 0.09, h: 0.48 },
-        { x: 0.60, w: 0.07, h: 0.55 },
-        { x: 0.68, w: 0.08, h: 0.38 },
-        { x: 0.77, w: 0.06, h: 0.46 },
-        { x: 0.84, w: 0.09, h: 0.35 },
-        { x: 0.94, w: 0.07, h: 0.42 },
+        { x: 0.00, w: 0.05, h: 0.32 },
+        { x: 0.06, w: 0.10, h: 0.48 },
+        { x: 0.17, w: 0.04, h: 0.36 },
+        { x: 0.22, w: 0.08, h: 0.55 },
+        { x: 0.31, w: 0.05, h: 0.40 },
+        { x: 0.37, w: 0.12, h: 0.60 },  // Wide tower - center
+        { x: 0.50, w: 0.04, h: 0.44 },
+        { x: 0.55, w: 0.09, h: 0.52 },
+        { x: 0.65, w: 0.06, h: 0.35 },
+        { x: 0.72, w: 0.11, h: 0.50 },
+        { x: 0.84, w: 0.04, h: 0.38 },
+        { x: 0.89, w: 0.07, h: 0.45 },
+        { x: 0.97, w: 0.04, h: 0.33 },
     ];
 
-    // Front row (closer, brighter, shorter)
+    // Front row (closer, brighter, shorter) - mixed silhouettes
     const frontBuildings = [
-        { x: 0.02, w: 0.07, h: 0.22 },
-        { x: 0.10, w: 0.05, h: 0.30 },
-        { x: 0.16, w: 0.08, h: 0.25 },
-        { x: 0.25, w: 0.06, h: 0.33 },
-        { x: 0.32, w: 0.07, h: 0.28 },
-        { x: 0.40, w: 0.06, h: 0.36 },
-        { x: 0.47, w: 0.08, h: 0.32 },
-        { x: 0.56, w: 0.06, h: 0.26 },
-        { x: 0.63, w: 0.07, h: 0.34 },
-        { x: 0.71, w: 0.06, h: 0.25 },
-        { x: 0.78, w: 0.08, h: 0.29 },
-        { x: 0.87, w: 0.06, h: 0.23 },
-        { x: 0.94, w: 0.07, h: 0.28 },
+        { x: 0.00, w: 0.10, h: 0.20 },
+        { x: 0.11, w: 0.04, h: 0.32 },
+        { x: 0.16, w: 0.07, h: 0.24 },
+        { x: 0.24, w: 0.11, h: 0.35 },
+        { x: 0.36, w: 0.05, h: 0.27 },
+        { x: 0.42, w: 0.09, h: 0.38 },
+        { x: 0.52, w: 0.04, h: 0.30 },
+        { x: 0.57, w: 0.08, h: 0.22 },
+        { x: 0.66, w: 0.05, h: 0.34 },
+        { x: 0.72, w: 0.10, h: 0.26 },
+        { x: 0.83, w: 0.04, h: 0.31 },
+        { x: 0.88, w: 0.08, h: 0.20 },
+        { x: 0.97, w: 0.04, h: 0.28 },
     ];
 
     function drawBuildingRow(buildings, bodyColor, winGapX, winGapY, winW, winH) {
@@ -2042,9 +2043,14 @@ function drawCitySkyline() {
                     const isLit = isBlinking ? blinkVal > 0 : seed % 3 !== 0;
 
                     if (isLit) {
-                        const warmth = seed % 3;
-                        ctx.fillStyle = warmth === 0 ? '#f0d06080' :
-                                        warmth === 1 ? '#e8c04070' : '#d0a03060';
+                        const tone = seed % 7;
+                        ctx.fillStyle = tone === 0 ? '#f0d06080' :  // warm gold
+                                        tone === 1 ? '#e8c04070' :  // amber
+                                        tone === 2 ? '#d0a03060' :  // deep amber
+                                        tone === 3 ? '#c0d8f050' :  // cool blue-white
+                                        tone === 4 ? '#f0e8c878' :  // bright warm
+                                        tone === 5 ? '#90b0d048' :  // steel blue
+                                                     '#e0c87060' ;  // muted gold
                     } else {
                         ctx.fillStyle = '#1a1a3a';
                     }
