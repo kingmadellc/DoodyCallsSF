@@ -321,33 +321,63 @@ const GAME_OVER_HEADLINES = [
 // ============================================
 const CHARACTERS = [
     {
-        id: 'default', name: 'The Rookie', desc: 'Standard issue sanitation worker',
-        color: '#f0a030', visorColor: '#40c0e0', ability: 'none',
-        abilityDesc: 'No special ability',
-    },
-    {
-        id: 'commuter', name: 'The Commuter', desc: 'Knows every shortcut in the city',
-        color: '#3080d0', visorColor: '#60e0ff', ability: 'speed',
-        abilityDesc: '+20% move speed',
-    },
-    {
-        id: 'tourist', name: 'The Tourist', desc: 'Coffee-powered, scared of alleys',
+        id: 'marty', name: 'Marty', desc: 'Coffee-powered, scared of alleys',
         color: '#d06030', visorColor: '#ff8040', ability: 'clean',
         abilityDesc: 'Auto-clean is faster (skip DIRTY state)',
     },
     {
-        id: 'analyst', name: 'The Analyst', desc: 'Sees the optimal cleaning path',
-        color: '#40b060', visorColor: '#80ff80', ability: 'reveal',
-        abilityDesc: 'Messes flash on minimap',
+        id: 'saas-accountant', name: 'The SaaS Accountant', desc: 'Reconciles messes like line items',
+        color: '#2080b0', visorColor: '#40c0ff', ability: 'efficiency',
+        abilityDesc: 'Cleaning earns +15% score bonus',
     },
     {
-        id: 'globetrotter', name: 'The Globetrotter', desc: 'World traveler, riot gear ready',
-        color: '#8040c0', visorColor: '#c080ff', ability: 'armor',
+        id: 'professor', name: 'The Professor', desc: 'Lectures pigeons on hygiene',
+        color: '#705030', visorColor: '#c0a070', ability: 'reveal',
+        abilityDesc: 'All messes visible on minimap',
+    },
+    {
+        id: 'eyeglass', name: 'The Eyeglass Aficionado', desc: 'Spots every speck through premium lenses',
+        color: '#a04080', visorColor: '#ff60c0', ability: 'vision',
+        abilityDesc: 'Wider visibility radius',
+    },
+    {
+        id: 'exec-producer', name: 'The Exec Producer', desc: 'Delegates cleaning, takes credit',
+        color: '#c0a020', visorColor: '#ffe060', ability: 'speed',
+        abilityDesc: '+20% move speed',
+    },
+    {
+        id: 'idaho-bro-1', name: 'Idahoan Brother #1', desc: 'Bald, bearded, built for hauling',
+        color: '#608040', visorColor: '#a0d060', ability: 'armor',
         abilityDesc: 'Immune to first earthquake',
     },
     {
-        id: 'scout', name: 'The Scout', desc: 'Reveals the whole map ahead of time',
-        color: '#c0c040', visorColor: '#ffff80', ability: 'scout',
+        id: 'idaho-bro-2', name: 'Idahoan Brother #2', desc: 'Dark-haired, bearded, quiet work ethic',
+        color: '#406830', visorColor: '#80c040', ability: 'scout',
+        abilityDesc: '+30s time on first district',
+    },
+    {
+        id: 'wealth-mgr', name: 'The Wealth Manager', desc: 'Diversifies his cleaning portfolio',
+        color: '#3050a0', visorColor: '#6090e0', ability: 'bonus',
+        abilityDesc: '+10% bonus time each district',
+    },
+    {
+        id: 'partner', name: 'The Partner', desc: 'Closing deals and closing dumpster lids',
+        color: '#404040', visorColor: '#a0a0a0', ability: 'armor',
+        abilityDesc: 'Immune to first earthquake',
+    },
+    {
+        id: 'designer', name: 'The Designer', desc: 'Won\'t clean until the grid is aligned',
+        color: '#c04060', visorColor: '#ff6090', ability: 'clean',
+        abilityDesc: 'Auto-clean is faster (skip DIRTY state)',
+    },
+    {
+        id: 'vp-bizdev', name: 'The VP of Biz Dev', desc: 'Pitches synergies to every pigeon',
+        color: '#306080', visorColor: '#50a0c0', ability: 'speed',
+        abilityDesc: '+20% move speed',
+    },
+    {
+        id: 'hr-lead', name: 'The HR Lead', desc: 'Files incident reports on every mess',
+        color: '#806040', visorColor: '#c0a080', ability: 'scout',
         abilityDesc: '+30s time on first district',
     },
 ];
@@ -425,7 +455,7 @@ let gameState = {
     earthquakeTimer: 0,
     earthquakeActive: false,
     earthquakeCooldown: 0,
-    earthquakeImmune: false,  // Globetrotter's ability
+    earthquakeImmune: false,  // Armor ability
 
     // Particles & celebrations
     particles: [],
@@ -835,7 +865,7 @@ function tryCleanTile(x, y) {
         const prevState = gameState.cleanState[y][x];
         const char = CHARACTERS[gameState.selectedCharacter];
 
-        // Tourist's ability: skip DIRTY state, go straight to CLEAN
+        // Clean ability: skip DIRTY state, go straight to CLEAN
         if (char.ability === 'clean' && prevState === CLEAN_STATE.FILTHY) {
             gameState.cleanState[y][x] = CLEAN_STATE.CLEAN;
             gameState.messesClean++;
@@ -1292,7 +1322,7 @@ function updateEarthquake(dt) {
         gameState.earthquakeTimer = 1.5 + Math.random() * 1.0; // 1.5-2.5s duration
         gameState.earthquakeCooldown = 0;
 
-        // Globetrotter's armor ability: immune to first earthquake
+        // Armor ability: immune to first earthquake
         if (gameState.earthquakeImmune) {
             gameState.earthquakeImmune = false;
             addCelebration('QUAKE BLOCKED!', gameState.player.x, gameState.player.y - 2, '#8040c0', true);
@@ -1464,6 +1494,8 @@ function startDistrict(districtIndex) {
     let timer = dist.timer;
     // Scout's ability: +30s on first district
     if (char.ability === 'scout' && districtIndex === 0) timer += 30;
+    // Wealth Manager's ability: +10% bonus time each district
+    if (char.ability === 'bonus') timer = Math.floor(timer * 1.1);
 
     gameState.timer = timer;
     gameState.screen = 'playing';
@@ -1494,7 +1526,7 @@ function startDistrict(districtIndex) {
     gameState.earthquakeTimer = 0;
     gameState.earthquakeActive = false;
     gameState.earthquakeCooldown = 15 + Math.random() * 10; // First quake after 15-25s
-    gameState.earthquakeImmune = char.ability === 'armor'; // Globetrotter
+    gameState.earthquakeImmune = char.ability === 'armor';
 
     // Generate level
     generateCityBlock(districtIndex);
@@ -1518,10 +1550,14 @@ function completeDistrict() {
         triggerShake(0.4, 10);
     }
 
+    // SaaS Accountant's efficiency ability: +15% score bonus
+    const char = CHARACTERS[gameState.selectedCharacter];
+    const effPct = char.ability === 'efficiency' ? Math.min(1, pct * 1.15) : pct;
+
     let stars = 0;
-    if (pct >= 0.6) stars = 1;
-    if (pct >= 0.8) stars = 2;
-    if (pct >= 1.0 && timeLeft > 10) stars = 3;
+    if (effPct >= 0.6) stars = 1;
+    if (effPct >= 0.8) stars = 2;
+    if (effPct >= 1.0 && timeLeft > 10) stars = 3;
 
     const distId = DISTRICTS[gameState.district].id;
     const prevStars = gameState.districtStars[distId] || 0;
@@ -2732,7 +2768,7 @@ function drawCharSelectScreen() {
     for (let i = 0; i < CHARACTERS.length; i++) {
         ctx.fillStyle = i === idx ? CHARACTERS[i].color : '#333';
         ctx.beginPath();
-        ctx.arc(canvas.width / 2 + (i - CHARACTERS.length / 2 + 0.5) * 20, dotY, 5, 0, Math.PI * 2);
+        ctx.arc(canvas.width / 2 + (i - CHARACTERS.length / 2 + 0.5) * 16, dotY, 4, 0, Math.PI * 2);
         ctx.fill();
     }
 
