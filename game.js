@@ -2211,8 +2211,11 @@ function drawTitleScreen() {
     ctx.fillStyle = COLORS.uiBg;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // City skyline silhouette
-    drawCitySkyline();
+    // City skyline silhouette — buildings sit above the menu
+    const menuY = canvas.height * 0.48;
+    const menuSpacing = 42;
+    const dailyChallengeY = menuY + 3 * menuSpacing + 20; // bottom of Daily Challenge text + desc
+    drawCitySkyline(dailyChallengeY);
 
     // Wordmark logo
     if (wordmarkImg.complete && wordmarkImg.naturalWidth > 0) {
@@ -2240,15 +2243,28 @@ function drawTitleScreen() {
         ctx.fillText('San Francisco Needs You.', canvas.width / 2, titleY + 35);
     }
 
-    // Menu backdrop (dims skyline behind menu for readability)
-    const menuY = canvas.height * 0.48;
-    const menuSpacing = 42;
-    const backdropGrad = ctx.createLinearGradient(0, menuY - 30, 0, menuY + menuSpacing * 4 + 10);
-    backdropGrad.addColorStop(0, 'rgba(10,10,26,0)');
-    backdropGrad.addColorStop(0.15, 'rgba(10,10,26,0.7)');
-    backdropGrad.addColorStop(1, 'rgba(10,10,26,0.7)');
-    ctx.fillStyle = backdropGrad;
-    ctx.fillRect(0, menuY - 30, canvas.width, menuSpacing * 4 + 40);
+    // Menu backdrop — centered translucent box behind menu items
+    const bufferY = 20;
+    const backdropTop = menuY - bufferY;
+    const backdropBottom = menuY + 3 * menuSpacing + 22 + bufferY; // bottom of Daily Challenge + desc + buffer
+    const backdropH = backdropBottom - backdropTop;
+    const backdropW = canvas.width * 0.65;
+    const backdropX = (canvas.width - backdropW) / 2;
+    ctx.fillStyle = 'rgba(10,10,26,0.65)';
+    // Rounded rect
+    const r = 8;
+    ctx.beginPath();
+    ctx.moveTo(backdropX + r, backdropTop);
+    ctx.lineTo(backdropX + backdropW - r, backdropTop);
+    ctx.quadraticCurveTo(backdropX + backdropW, backdropTop, backdropX + backdropW, backdropTop + r);
+    ctx.lineTo(backdropX + backdropW, backdropTop + backdropH - r);
+    ctx.quadraticCurveTo(backdropX + backdropW, backdropTop + backdropH, backdropX + backdropW - r, backdropTop + backdropH);
+    ctx.lineTo(backdropX + r, backdropTop + backdropH);
+    ctx.quadraticCurveTo(backdropX, backdropTop + backdropH, backdropX, backdropTop + backdropH - r);
+    ctx.lineTo(backdropX, backdropTop + r);
+    ctx.quadraticCurveTo(backdropX, backdropTop, backdropX + r, backdropTop);
+    ctx.closePath();
+    ctx.fill();
 
     // Menu options
     const dailyDist = DISTRICTS[getDailyDistrictIndex()];
@@ -2300,12 +2316,13 @@ function drawTitleScreen() {
                  canvas.width / 2, canvas.height - 20);
 }
 
-function drawCitySkyline() {
+function drawCitySkyline(bottomY) {
     const t = animCache.time;
     const cw = canvas.width;
     const ch = canvas.height;
+    const baseY = bottomY || ch; // where building bottoms sit
 
-    // Back row (distant, dimmer) - tall enough to go behind logo
+    // Back row (distant, dimmer) - heights relative to baseY
     const backBuildings = [
         { x: 0.00, w: 0.05, h: 0.55 },
         { x: 0.06, w: 0.10, h: 0.75 },
@@ -2344,14 +2361,14 @@ function drawCitySkyline() {
             const bx = b.x * cw;
             const bw = b.w * cw;
             const bh = b.h * ch;
-            const topY = ch - bh;
+            const topY = baseY - bh;
 
             // Building body
             ctx.fillStyle = bodyColor;
             ctx.fillRect(bx, topY, bw, bh);
 
             // Windows with blinking lights
-            for (let wy = topY + 4; wy < ch - 3; wy += winGapY) {
+            for (let wy = topY + 4; wy < baseY - 3; wy += winGapY) {
                 for (let wx = bx + 3; wx < bx + bw - 3; wx += winGapX) {
                     const seed = (Math.floor(wx) * 137 + Math.floor(wy) * 251) % 1000;
                     const blinkRate = 0.08 + (seed % 60) / 60 * 0.35;
