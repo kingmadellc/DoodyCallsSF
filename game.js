@@ -352,6 +352,31 @@ const NEWS_HEADLINES = [
     "Study finds SF sidewalks contain 'more biodiversity than Muir Woods'",
     "Local man in trenchcoat insists he was 'just resting' in alley",
     "Porta-potty startup raises $50M, deploys zero units",
+    "EXCLUSIVE: Marty's Bavarian dev team ships game overnight, demands lederhosen as payment",
+    "Local man in Pleasanton claims SF commute is 'basically Mad Max,' has not visited in 4 years",
+    "REPORT: Man buys Super Bowl tickets on Affirm, describes it as 'an investment in his health'",
+    "STUDY: Average Slack message length increases 400% when topic is 'the future of software'",
+    "Fantasy GM trades back 47 times, claims 'absurd offers' are a strategy",
+    "Group chat derails into 2-day discussion about anatomy, everyone pretends to be uncomfortable",
+    "Former welder promoted to VP, still convinced he's 'just a welder'",
+    "Man's 100% clean district ruined by pigeon at 1 second remaining, files formal complaint",
+    "Tech worker describes AI as 'outrageously productive,' has deployed zero units to production",
+    "European vacation shopper 'saves money' on clearance clothes, pays overweight bag fee",
+    "Analyst measures group chat quality using 'peen per day' ratio, publishes findings",
+    "Man at W Hotel counts two human situations on walk to coffee, considers it 'an adventure'",
+    "Local dad justifies $6,586 sporting event as 'basically a vacation in Santa Clara'",
+    "AI skeptic won over by one end-of-year review doc, now fully radicalized",
+    "Man's wife demands Backstreet Boys concert ticket as payment for football game attendance",
+    "Group chat member asks 'what is Claude,' receives 14 different explanations in 30 seconds",
+    "Fantasy football league measures value of 6'7 tight end exclusively by height, signs immediately",
+    "Non-coder builds game in 20 minutes, QA team is also AI, no humans were consulted",
+    "Slack group invents new metric: 'trailing 2-day PPD currently at 1.000'",
+    "Survey: Local men describe 0% APR as 'basically free money,' financial advisors weep",
+    "City employee's wife calculates chore-to-game-attendance conversion rate at 4.7:1",
+    "Seattle fan runs same team simulation 3 times, gets different result each time, posts all of them",
+    "Breaking: Game developer's friend opens game on phone, can't turn, blames the developer",
+    "Man casually walks through European police riot on way to Airbnb, calls it 'sightseeing'",
+    "Tech exec claims AI will replace all software in 2 years, still can't get mobile controls working",
 ];
 
 // Game over headlines (shown when timer runs out)
@@ -371,7 +396,7 @@ const GAME_OVER_HEADLINES = [
 const CHARACTERS = [
     {
         id: 'ryan-leaf', name: 'Ryan Leaf', desc: 'Failed QB turned street sweeper',
-        color: '#2a6e2a', visorColor: '#50c050', ability: 'speed',
+        color: '#e8d040', visorColor: '#60c0e0', bootsColor: '#f0f0f0', ability: 'speed',
         abilityDesc: '+20% move speed',
     },
     {
@@ -2379,7 +2404,7 @@ function drawPlayer() {
     ctx.globalAlpha = 1;
 
     // Boots
-    ctx.fillStyle = COLORS.playerBoots;
+    ctx.fillStyle = char.bootsColor || COLORS.playerBoots;
     ctx.fillRect(sx + 6, sy + TILE_SIZE - 6, 6, 4);
     ctx.fillRect(sx + TILE_SIZE - 12, sy + TILE_SIZE - 6, 6, 4);
 
@@ -3200,7 +3225,7 @@ function drawCharSelectScreen() {
     ctx.fillRect(previewX - sz / 5, previewY - sz / 2 + 8, sz * 2 / 5, sz / 6);
 
     // Boots
-    ctx.fillStyle = '#3a3a3a';
+    ctx.fillStyle = char.bootsColor || '#3a3a3a';
     ctx.fillRect(previewX - sz / 3, previewY + sz / 3 - 4, sz / 4, 8);
     ctx.fillRect(previewX + sz / 12, previewY + sz / 3 - 4, sz / 4, 8);
 
