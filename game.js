@@ -108,6 +108,14 @@ const TILE = {
     HOTEL: 8,
     OFFICE: 9,
     CURB: 10,
+    WATER: 11,
+    PIER: 12,
+    FOUNTAIN: 13,
+    SHOP_FRONT: 14,
+    MURAL_WALL: 15,
+    PLAZA: 16,
+    TREE: 17,
+    GATE: 18,
 };
 
 // Mess types overlaid on tiles
@@ -129,12 +137,15 @@ const CLEAN_STATE = {
 };
 
 function isBlockingTile(tile) {
-    return tile === TILE.BUILDING || tile === TILE.HOTEL || tile === TILE.OFFICE;
+    return tile === TILE.BUILDING || tile === TILE.HOTEL || tile === TILE.OFFICE ||
+           tile === TILE.WATER || tile === TILE.FOUNTAIN || tile === TILE.SHOP_FRONT ||
+           tile === TILE.MURAL_WALL || tile === TILE.TREE;
 }
 
 function isCleanableTile(tile) {
     return tile === TILE.SIDEWALK || tile === TILE.ALLEY || tile === TILE.CROSSWALK ||
-           tile === TILE.CURB || tile === TILE.PARK_GRASS;
+           tile === TILE.CURB || tile === TILE.PARK_GRASS || tile === TILE.PIER ||
+           tile === TILE.PLAZA;
 }
 
 // ============================================
@@ -184,6 +195,44 @@ const COLORS = {
 
     // Curb
     curbColor: '#9a9080',
+
+    // Water
+    waterDeep: '#1a3a6a',
+    waterLight: '#2a5a8a',
+    waterFoam: '#8ab0d0',
+
+    // Pier
+    pierWood: '#8a6a3a',
+    pierWoodAlt: '#7a5a2a',
+    pierNail: '#4a4a4a',
+
+    // Fountain
+    fountainStone: '#9a9aaa',
+    fountainWater: '#4a8ab0',
+
+    // Shop front
+    shopWall: '#6a5a4a',
+
+    // Mural
+    muralBase: '#8a7a6a',
+    muralColors: ['#e04060', '#40a0e0', '#e0c040', '#40c080', '#c060e0'],
+
+    // Plaza
+    plazaBrick: '#b09070',
+    plazaBrickAlt: '#a08060',
+
+    // Tree
+    treeTrunkDark: '#5a3a1a',
+    treeLeafDark: '#2a6a1a',
+    treeLeafLight: '#4a9a3a',
+
+    // Gate
+    gateRed: '#c02020',
+    gateGold: '#e0c040',
+
+    // City Hall
+    civicStone: '#c0b8b0',
+    civicColumn: '#d0c8c0',
 
     // Mess colors
     litterColor: '#d0c0a0',
@@ -317,9 +366,14 @@ const GAME_OVER_HEADLINES = [
 ];
 
 // ============================================
-// CHARACTERS (friend group)
+// CHARACTERS
 // ============================================
 const CHARACTERS = [
+    {
+        id: 'ryan-leaf', name: 'Ryan Leaf', desc: 'Failed QB turned street sweeper',
+        color: '#2a6e2a', visorColor: '#50c050', ability: 'speed',
+        abilityDesc: '+20% move speed',
+    },
     {
         id: 'marty', name: 'Marty', desc: 'Coffee-powered, scared of alleys',
         color: '#d06030', visorColor: '#ff8040', ability: 'clean',
@@ -640,42 +694,265 @@ function generateCityBlock(districtIndex) {
     placeBuilding(tiles, 20, 20, 4, 3);
 
     // === DISTRICT-SPECIFIC FEATURES ===
-    if (districtIndex === 2) {
+    if (districtIndex === 0) {
+        // District 1: Fisherman's Wharf - waterfront piers
+        // Water strip across top
+        for (let y = 0; y < 4; y++) {
+            for (let x = 0; x < 10; x++) tiles[y][x] = TILE.WATER;
+            for (let x = 15; x < MAP_WIDTH; x++) tiles[y][x] = TILE.WATER;
+        }
+        // Pier docks on left and right
+        for (let y = 4; y < 9; y++) {
+            for (let x = 0; x < 4; x++) tiles[y][x] = TILE.PIER;
+            for (let x = 20; x < MAP_WIDTH; x++) tiles[y][x] = TILE.PIER;
+        }
+        // Horizontal pier connecting left dock
+        for (let x = 4; x < 10; x++) tiles[4][x] = TILE.PIER;
+        // Small wharf building (fish market)
+        for (let y = 5; y < 8; y++) {
+            for (let x = 5; x < 9; x++) tiles[y][x] = TILE.BUILDING;
+        }
+        tiles[7][6] = TILE.BUILDING_DOOR;
+        // Pre-place food waste on piers
+        messes[5][1] = MESS.FOOD_WASTE; cleanState[5][1] = CLEAN_STATE.FILTHY;
+        messes[6][2] = MESS.FOOD_WASTE; cleanState[6][2] = CLEAN_STATE.DIRTY;
+        messes[5][21] = MESS.FOOD_WASTE; cleanState[5][21] = CLEAN_STATE.FILTHY;
+        messes[7][22] = MESS.LITTER; cleanState[7][22] = CLEAN_STATE.DIRTY;
+
+    } else if (districtIndex === 1) {
+        // District 2: Union Square - grand plaza with fountain
+        // Plaza in bottom-right quadrant
+        for (let y = 15; y < 23; y++) {
+            for (let x = 15; x < 23; x++) tiles[y][x] = TILE.PLAZA;
+        }
+        // Fountain in center of plaza
+        tiles[18][18] = TILE.FOUNTAIN;
+        tiles[18][19] = TILE.FOUNTAIN;
+        tiles[19][18] = TILE.FOUNTAIN;
+        tiles[19][19] = TILE.FOUNTAIN;
+        // Luxury shop front top-left
+        for (let y = 0; y < 4; y++) {
+            for (let x = 0; x < 4; x++) tiles[y][x] = TILE.SHOP_FRONT;
+        }
+
+    } else if (districtIndex === 2) {
         // District 3: SoMa
         // Hotel - top right
         for (let y = 0; y < 4; y++) {
-            for (let x = 15; x < 19; x++) {
-                tiles[y][x] = TILE.HOTEL;
-            }
+            for (let x = 15; x < 19; x++) tiles[y][x] = TILE.HOTEL;
         }
-        // Tech office - across the street
+        // Office building - across the street
         for (let y = 0; y < 4; y++) {
-            for (let x = 20; x < 24; x++) {
-                tiles[y][x] = TILE.OFFICE;
-            }
+            for (let x = 20; x < 24; x++) tiles[y][x] = TILE.OFFICE;
         }
         // Coffee shop next to hotel
         tiles[5][15] = TILE.COFFEE_SHOP;
         tiles[5][16] = TILE.COFFEE_SHOP;
         tiles[6][15] = TILE.COFFEE_SHOP;
         tiles[6][16] = TILE.COFFEE_SHOP;
-
-        // Alley across from coffee shop (THE easter egg alley)
+        // Alley across from coffee shop
         for (let y = 5; y < 9; y++) {
             tiles[y][17] = TILE.ALLEY;
             tiles[y][18] = TILE.ALLEY;
         }
-
         // Place "mystery puddle" in the alley
-        messes[6][17] = MESS.MYSTERY;
-        cleanState[6][17] = CLEAN_STATE.FILTHY;
-        messes[7][17] = MESS.MYSTERY;
-        cleanState[7][17] = CLEAN_STATE.FILTHY;
+        messes[6][17] = MESS.MYSTERY; cleanState[6][17] = CLEAN_STATE.FILTHY;
+        messes[7][17] = MESS.MYSTERY; cleanState[7][17] = CLEAN_STATE.FILTHY;
+
+    } else if (districtIndex === 3) {
+        // District 4: Russian Hill - hilltop park with trees
+        // Large park in top-left quadrant
+        for (let y = 0; y < 6; y++) {
+            for (let x = 0; x < 9; x++) tiles[y][x] = TILE.PARK_GRASS;
+        }
+        // Scatter trees in the park
+        const russianHillTrees = [
+            [0,0],[0,3],[0,7],[1,5],[2,1],[2,8],
+            [3,0],[3,6],[4,3],[4,8],[5,1],[5,5]
+        ];
+        for (const [ty, tx] of russianHillTrees) tiles[ty][tx] = TILE.TREE;
+        // Second green patch bottom-right
+        for (let y = 15; y < 19; y++) {
+            for (let x = 15; x < 19; x++) {
+                if (tiles[y][x] === TILE.BUILDING || tiles[y][x] === TILE.BUILDING_DOOR) {
+                    tiles[y][x] = TILE.PARK_GRASS;
+                }
+            }
+        }
+        tiles[16][16] = TILE.TREE;
+        tiles[17][17] = TILE.TREE;
+
+    } else if (districtIndex === 4) {
+        // District 5: Haight-Ashbury - colorful murals + vintage shops
+        // Mural walls top rows
+        for (let y = 0; y < 4; y++) {
+            for (let x = 0; x < 4; x++) tiles[y][x] = TILE.MURAL_WALL;
+            for (let x = 5; x < 9; x++) tiles[y][x] = TILE.MURAL_WALL;
+        }
+        // Shop fronts below murals
+        for (let y = 5; y < 8; y++) {
+            for (let x = 0; x < 4; x++) tiles[y][x] = TILE.SHOP_FRONT;
+            for (let x = 5; x < 9; x++) tiles[y][x] = TILE.SHOP_FRONT;
+        }
+        // More shops bottom-right
+        for (let y = 15; y < 19; y++) {
+            for (let x = 20; x < MAP_WIDTH; x++) tiles[y][x] = TILE.SHOP_FRONT;
+        }
+
+    } else if (districtIndex === 5) {
+        // District 6: Mission District - taquerias + murals
+        // Mural walls top-left upper
+        for (let y = 0; y < 4; y++) {
+            for (let x = 0; x < 4; x++) tiles[y][x] = TILE.MURAL_WALL;
+            for (let x = 5; x < 9; x++) tiles[y][x] = TILE.MURAL_WALL;
+        }
+        // Taqueria row below murals
+        for (let y = 5; y < 8; y++) {
+            for (let x = 0; x < 9; x++) tiles[y][x] = TILE.SHOP_FRONT;
+        }
+        // More taquerias bottom-right
+        for (let y = 15; y < 19; y++) {
+            for (let x = 15; x < MAP_WIDTH; x++) tiles[y][x] = TILE.SHOP_FRONT;
+        }
+        // Wider alley between mural blocks
+        for (let y = 0; y < 9; y++) {
+            if (tiles[y][4] !== TILE.ROAD) tiles[y][4] = TILE.ALLEY;
+            if (tiles[y][5] !== TILE.ROAD && tiles[y][5] !== TILE.SHOP_FRONT && tiles[y][5] !== TILE.MURAL_WALL) {
+                tiles[y][5] = TILE.ALLEY;
+            }
+        }
+
+    } else if (districtIndex === 6) {
+        // District 7: The Tenderloin - dense alleys + vacant lot
+        // Extra alleys everywhere (overwrite sidewalk only)
+        const extraAlleyCols = [2, 7, 16, 21];
+        for (const col of extraAlleyCols) {
+            for (let y = 0; y < 9; y++) {
+                if (tiles[y][col] === TILE.SIDEWALK) tiles[y][col] = TILE.ALLEY;
+            }
+            for (let y = 15; y < MAP_HEIGHT; y++) {
+                if (tiles[y][col] === TILE.SIDEWALK) tiles[y][col] = TILE.ALLEY;
+            }
+        }
+        // Horizontal alleys
+        for (let x = 0; x < 9; x++) {
+            if (tiles[2][x] === TILE.SIDEWALK) tiles[2][x] = TILE.ALLEY;
+            if (tiles[7][x] === TILE.SIDEWALK) tiles[7][x] = TILE.ALLEY;
+        }
+        for (let x = 15; x < MAP_WIDTH; x++) {
+            if (tiles[17][x] === TILE.SIDEWALK) tiles[17][x] = TILE.ALLEY;
+            if (tiles[22][x] === TILE.SIDEWALK) tiles[22][x] = TILE.ALLEY;
+        }
+        // Vacant lot bottom-right far corner
+        for (let y = 19; y < MAP_HEIGHT; y++) {
+            for (let x = 15; x < MAP_WIDTH; x++) tiles[y][x] = TILE.ALLEY;
+        }
+        // Grimy shop fronts
+        for (let y = 5; y < 8; y++) {
+            for (let x = 15; x < 18; x++) tiles[y][x] = TILE.SHOP_FRONT;
+        }
+        // Pre-place mystery puddles in vacant lot
+        messes[20][17] = MESS.MYSTERY; cleanState[20][17] = CLEAN_STATE.FILTHY;
+        messes[21][19] = MESS.MYSTERY; cleanState[21][19] = CLEAN_STATE.FILTHY;
+        messes[20][21] = MESS.MYSTERY; cleanState[20][21] = CLEAN_STATE.FILTHY;
+        messes[22][18] = MESS.MYSTERY; cleanState[22][18] = CLEAN_STATE.FILTHY;
+
+    } else if (districtIndex === 7) {
+        // District 8: Golden Gate Park - vast park with pond
+        // Top-left quadrant → park
+        for (let y = 0; y < 9; y++) {
+            for (let x = 0; x < 10; x++) {
+                if (tiles[y][x] !== TILE.ROAD && tiles[y][x] !== TILE.CROSSWALK && tiles[y][x] !== TILE.CURB) {
+                    tiles[y][x] = TILE.PARK_GRASS;
+                }
+            }
+        }
+        // Bottom-right quadrant → park
+        for (let y = 15; y < MAP_HEIGHT; y++) {
+            for (let x = 14; x < MAP_WIDTH; x++) {
+                if (tiles[y][x] !== TILE.ROAD && tiles[y][x] !== TILE.CROSSWALK && tiles[y][x] !== TILE.CURB) {
+                    tiles[y][x] = TILE.PARK_GRASS;
+                }
+            }
+        }
+        // Pond in top-left
+        for (let y = 1; y < 6; y++) {
+            for (let x = 1; x < 7; x++) tiles[y][x] = TILE.WATER;
+        }
+        // Trees in top-left park
+        const ggpTreesTop = [[0,0],[0,4],[0,8],[2,8],[3,7],[6,0],[6,3],[6,7],[7,1],[7,5],[8,3],[8,8]];
+        for (const [ty, tx] of ggpTreesTop) {
+            if (tiles[ty][tx] === TILE.PARK_GRASS) tiles[ty][tx] = TILE.TREE;
+        }
+        // Trees in bottom-right park
+        const ggpTreesBot = [[15,15],[15,19],[15,23],[17,17],[17,22],[19,15],[19,20],[20,18],[21,23],[22,15],[22,21],[23,17]];
+        for (const [ty, tx] of ggpTreesBot) {
+            if (tiles[ty][tx] === TILE.PARK_GRASS) tiles[ty][tx] = TILE.TREE;
+        }
+
+    } else if (districtIndex === 8) {
+        // District 9: Chinatown - dragon gate + dense shop fronts
+        // Dragon gate across road approach
+        for (let x = 10; x <= 13; x++) tiles[8][x] = TILE.GATE;
+        // Replace most buildings with shop fronts (dense market feel)
+        for (let y = 0; y < 5; y++) {
+            for (let x = 0; x < 4; x++) tiles[y][x] = TILE.SHOP_FRONT;
+            for (let x = 5; x < 9; x++) tiles[y][x] = TILE.SHOP_FRONT;
+            for (let x = 15; x < 19; x++) tiles[y][x] = TILE.SHOP_FRONT;
+            for (let x = 20; x < MAP_WIDTH; x++) tiles[y][x] = TILE.SHOP_FRONT;
+        }
+        for (let y = 5; y < 8; y++) {
+            for (let x = 0; x < 4; x++) tiles[y][x] = TILE.SHOP_FRONT;
+            for (let x = 5; x < 9; x++) tiles[y][x] = TILE.SHOP_FRONT;
+        }
+        // Bottom shops
+        for (let y = 15; y < 19; y++) {
+            for (let x = 0; x < 4; x++) tiles[y][x] = TILE.SHOP_FRONT;
+            for (let x = 5; x < 9; x++) tiles[y][x] = TILE.SHOP_FRONT;
+        }
+
+    } else if (districtIndex === 9) {
+        // District 10: City Hall - grand civic building + formal plaza
+        // Large City Hall building top-left
+        for (let y = 0; y < 7; y++) {
+            for (let x = 0; x < 9; x++) tiles[y][x] = TILE.BUILDING;
+        }
+        // Columned entrance along bottom of City Hall
+        for (let x = 2; x < 7; x++) tiles[6][x] = TILE.GATE;
+        // Civic plaza top-right
+        for (let y = 0; y < 9; y++) {
+            for (let x = 15; x < MAP_WIDTH; x++) {
+                if (tiles[y][x] !== TILE.ROAD && tiles[y][x] !== TILE.CROSSWALK && tiles[y][x] !== TILE.CURB) {
+                    tiles[y][x] = TILE.PLAZA;
+                }
+            }
+        }
+        // Fountain in plaza center
+        tiles[3][18] = TILE.FOUNTAIN;
+        tiles[3][19] = TILE.FOUNTAIN;
+        tiles[4][18] = TILE.FOUNTAIN;
+        tiles[4][19] = TILE.FOUNTAIN;
+        // Tree-lined approach south of City Hall
+        const cityHallTrees = [[7,0],[7,2],[7,4],[7,6],[7,8]];
+        for (const [ty, tx] of cityHallTrees) {
+            if (tiles[ty][tx] !== TILE.ROAD) tiles[ty][tx] = TILE.TREE;
+        }
+        // Second plaza bottom-left
+        for (let y = 20; y < MAP_HEIGHT; y++) {
+            for (let x = 0; x < 9; x++) {
+                if (tiles[y][x] !== TILE.ROAD && tiles[y][x] !== TILE.CROSSWALK && tiles[y][x] !== TILE.CURB) {
+                    tiles[y][x] = TILE.PLAZA;
+                }
+            }
+        }
+        tiles[21][3] = TILE.FOUNTAIN;
+        tiles[21][4] = TILE.FOUNTAIN;
+        tiles[22][3] = TILE.FOUNTAIN;
+        tiles[22][4] = TILE.FOUNTAIN;
     }
 
-    // === PARK AREAS (small green patches) ===
-    if (districtIndex >= 3) {
-        // Add some park grass in bottom-left
+    // === PARK AREAS (small green patches) - for districts without custom layouts ===
+    if (districtIndex >= 3 && districtIndex !== 7 && districtIndex !== 8 && districtIndex !== 9) {
         for (let y = 15; y < 18; y++) {
             for (let x = 6; x < 9; x++) {
                 if (tiles[y][x] === TILE.SIDEWALK) {
@@ -686,14 +963,16 @@ function generateCityBlock(districtIndex) {
     }
 
     // === ALLEYS between buildings ===
-    // Vertical alleys
-    for (let y = 0; y < 9; y++) {
-        if (tiles[y][4] === TILE.SIDEWALK) tiles[y][4] = TILE.ALLEY;
-        if (tiles[y][19] === TILE.SIDEWALK) tiles[y][19] = TILE.ALLEY;
-    }
-    for (let y = 15; y < MAP_HEIGHT; y++) {
-        if (tiles[y][4] === TILE.SIDEWALK) tiles[y][4] = TILE.ALLEY;
-        if (tiles[y][19] === TILE.SIDEWALK) tiles[y][19] = TILE.ALLEY;
+    // Skip alleys for Golden Gate Park (nature, not urban)
+    if (districtIndex !== 7) {
+        for (let y = 0; y < 9; y++) {
+            if (tiles[y][4] === TILE.SIDEWALK) tiles[y][4] = TILE.ALLEY;
+            if (tiles[y][19] === TILE.SIDEWALK) tiles[y][19] = TILE.ALLEY;
+        }
+        for (let y = 15; y < MAP_HEIGHT; y++) {
+            if (tiles[y][4] === TILE.SIDEWALK) tiles[y][4] = TILE.ALLEY;
+            if (tiles[y][19] === TILE.SIDEWALK) tiles[y][19] = TILE.ALLEY;
+        }
     }
 
     // === SCATTER MESSES ===
@@ -705,11 +984,48 @@ function generateCityBlock(districtIndex) {
         const x = Math.floor(Math.random() * MAP_WIDTH);
         const y = Math.floor(Math.random() * MAP_HEIGHT);
         if (isCleanableTile(tiles[y][x]) && messes[y][x] === MESS.NONE) {
-            // Pick mess type based on tile
+            // Pick mess type based on tile and district
             if (tiles[y][x] === TILE.ALLEY) {
                 messes[y][x] = Math.random() < 0.4 ? MESS.MYSTERY : MESS.PUDDLE;
             } else if (tiles[y][x] === TILE.PARK_GRASS) {
                 messes[y][x] = MESS.LITTER;
+            } else if (districtIndex === 0) {
+                // Fisherman's Wharf: more food waste
+                const roll = Math.random();
+                if (roll < 0.4) messes[y][x] = MESS.FOOD_WASTE;
+                else if (roll < 0.7) messes[y][x] = MESS.LITTER;
+                else messes[y][x] = MESS.PUDDLE;
+            } else if (districtIndex === 4) {
+                // Haight-Ashbury: more graffiti
+                const roll = Math.random();
+                if (roll < 0.4) messes[y][x] = MESS.GRAFFITI;
+                else if (roll < 0.65) messes[y][x] = MESS.LITTER;
+                else if (roll < 0.85) messes[y][x] = MESS.PUDDLE;
+                else messes[y][x] = MESS.FOOD_WASTE;
+            } else if (districtIndex === 5) {
+                // Mission: more food waste
+                const roll = Math.random();
+                if (roll < 0.4) messes[y][x] = MESS.FOOD_WASTE;
+                else if (roll < 0.6) messes[y][x] = MESS.LITTER;
+                else if (roll < 0.8) messes[y][x] = MESS.GRAFFITI;
+                else messes[y][x] = MESS.PUDDLE;
+            } else if (districtIndex === 6) {
+                // Tenderloin: heavy mystery + puddle
+                const roll = Math.random();
+                if (roll < 0.35) messes[y][x] = MESS.MYSTERY;
+                else if (roll < 0.65) messes[y][x] = MESS.PUDDLE;
+                else if (roll < 0.85) messes[y][x] = MESS.LITTER;
+                else messes[y][x] = MESS.FOOD_WASTE;
+            } else if (districtIndex === 7) {
+                // Golden Gate Park: mostly litter, some puddle
+                messes[y][x] = Math.random() < 0.7 ? MESS.LITTER : MESS.PUDDLE;
+            } else if (districtIndex === 8) {
+                // Chinatown: litter + food waste
+                const roll = Math.random();
+                if (roll < 0.35) messes[y][x] = MESS.LITTER;
+                else if (roll < 0.65) messes[y][x] = MESS.FOOD_WASTE;
+                else if (roll < 0.85) messes[y][x] = MESS.PUDDLE;
+                else messes[y][x] = MESS.GRAFFITI;
             } else {
                 const roll = Math.random();
                 if (roll < 0.35) messes[y][x] = MESS.LITTER;
@@ -1492,9 +1808,9 @@ function startDistrict(districtIndex) {
     const char = CHARACTERS[gameState.selectedCharacter];
 
     let timer = dist.timer;
-    // Scout's ability: +30s on first district
+    // Scout ability: +30s on first district
     if (char.ability === 'scout' && districtIndex === 0) timer += 30;
-    // Wealth Manager's ability: +10% bonus time each district
+    // Bonus ability: +10% bonus time each district
     if (char.ability === 'bonus') timer = Math.floor(timer * 1.1);
 
     gameState.timer = timer;
@@ -1550,7 +1866,7 @@ function completeDistrict() {
         triggerShake(0.4, 10);
     }
 
-    // SaaS Accountant's efficiency ability: +15% score bonus
+    // Efficiency ability: +15% score bonus
     const char = CHARACTERS[gameState.selectedCharacter];
     const effPct = char.ability === 'efficiency' ? Math.min(1, pct * 1.15) : pct;
 
@@ -1786,6 +2102,155 @@ function drawTile(x, y) {
             ctx.fillStyle = COLORS.curbColor;
             ctx.fillRect(sx, sy + TILE_SIZE - 4, TILE_SIZE, 4);
             break;
+
+        case TILE.WATER:
+            ctx.fillStyle = COLORS.waterDeep;
+            ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+            ctx.strokeStyle = COLORS.waterLight;
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 3; i++) {
+                const wy = sy + 8 + i * 10;
+                const waveOffset = Math.sin(animCache.time * 2 + x * 0.5 + i) * 3;
+                ctx.beginPath();
+                ctx.moveTo(sx, wy + waveOffset);
+                ctx.lineTo(sx + TILE_SIZE / 2, wy - waveOffset);
+                ctx.lineTo(sx + TILE_SIZE, wy + waveOffset);
+                ctx.stroke();
+            }
+            if ((x * 7 + y * 3) % 5 === 0) {
+                ctx.fillStyle = COLORS.waterFoam;
+                ctx.fillRect(sx + 4, sy + 2, 3, 2);
+            }
+            break;
+
+        case TILE.PIER:
+            ctx.fillStyle = (x + y) % 2 === 0 ? COLORS.pierWood : COLORS.pierWoodAlt;
+            ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+            ctx.strokeStyle = '#6a5020';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 4; i++) {
+                ctx.beginPath();
+                ctx.moveTo(sx, sy + i * 8 + 4);
+                ctx.lineTo(sx + TILE_SIZE, sy + i * 8 + 4);
+                ctx.stroke();
+            }
+            if ((x * 3 + y * 5) % 4 === 0) {
+                ctx.fillStyle = COLORS.pierNail;
+                ctx.fillRect(sx + 6, sy + 6, 2, 2);
+                ctx.fillRect(sx + 22, sy + 22, 2, 2);
+            }
+            break;
+
+        case TILE.FOUNTAIN:
+            ctx.fillStyle = COLORS.fountainStone;
+            ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+            ctx.fillStyle = COLORS.fountainWater;
+            ctx.beginPath();
+            ctx.arc(sx + TILE_SIZE / 2, sy + TILE_SIZE / 2, TILE_SIZE / 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#7a7a8a';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            const spoutH = 4 + Math.sin(animCache.time * 4) * 2;
+            ctx.fillStyle = COLORS.waterFoam;
+            ctx.fillRect(sx + TILE_SIZE / 2 - 1, sy + TILE_SIZE / 2 - spoutH, 2, spoutH);
+            break;
+
+        case TILE.SHOP_FRONT: {
+            const dist = DISTRICTS[gameState.district];
+            const awningColor = dist ? dist.palette.accent : '#c04040';
+            ctx.fillStyle = COLORS.shopWall;
+            ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+            ctx.fillStyle = '#2a3a4a';
+            ctx.fillRect(sx + 4, sy + 10, TILE_SIZE - 8, TILE_SIZE - 12);
+            ctx.fillStyle = awningColor;
+            ctx.fillRect(sx, sy, TILE_SIZE, 8);
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            for (let i = 0; i < 4; i += 2) {
+                ctx.fillRect(sx + i * (TILE_SIZE / 4), sy, TILE_SIZE / 4, 8);
+            }
+            break;
+        }
+
+        case TILE.MURAL_WALL: {
+            ctx.fillStyle = COLORS.muralBase;
+            ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+            const mColors = COLORS.muralColors;
+            for (let i = 0; i < 3; i++) {
+                const ci = (x * 3 + y * 7 + i * 5) % mColors.length;
+                ctx.fillStyle = mColors[ci];
+                ctx.fillRect(sx + 2, sy + 2 + i * 10, TILE_SIZE - 4, 8);
+            }
+            ctx.strokeStyle = '#5a4a3a';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(sx + 1, sy + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+            break;
+        }
+
+        case TILE.PLAZA:
+            ctx.fillStyle = (x + y) % 2 === 0 ? COLORS.plazaBrick : COLORS.plazaBrickAlt;
+            ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+            ctx.strokeStyle = '#908070';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 4; i++) {
+                ctx.beginPath();
+                ctx.moveTo(sx, sy + i * 8);
+                ctx.lineTo(sx + TILE_SIZE, sy + i * 8);
+                ctx.stroke();
+            }
+            {
+                const brickOff = (y % 2) * (TILE_SIZE / 2);
+                ctx.beginPath();
+                ctx.moveTo(sx + brickOff + TILE_SIZE / 2, sy);
+                ctx.lineTo(sx + brickOff + TILE_SIZE / 2, sy + TILE_SIZE);
+                ctx.stroke();
+            }
+            break;
+
+        case TILE.TREE:
+            ctx.fillStyle = COLORS.grassDark;
+            ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+            ctx.fillStyle = COLORS.treeTrunkDark;
+            ctx.fillRect(sx + 12, sy + 18, 8, 14);
+            ctx.fillStyle = COLORS.treeLeafDark;
+            ctx.beginPath();
+            ctx.arc(sx + TILE_SIZE / 2, sy + 12, 12, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = COLORS.treeLeafLight;
+            ctx.beginPath();
+            ctx.arc(sx + TILE_SIZE / 2 - 3, sy + 9, 6, 0, Math.PI * 2);
+            ctx.fill();
+            break;
+
+        case TILE.GATE: {
+            ctx.fillStyle = COLORS.roadDark;
+            ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+            if (gameState.district === 8) {
+                // Chinatown dragon gate
+                ctx.fillStyle = COLORS.gateRed;
+                ctx.fillRect(sx, sy, 6, TILE_SIZE);
+                ctx.fillRect(sx + TILE_SIZE - 6, sy, 6, TILE_SIZE);
+                ctx.fillStyle = COLORS.gateGold;
+                ctx.fillRect(sx, sy, TILE_SIZE, 6);
+                ctx.fillRect(sx + TILE_SIZE / 2 - 3, sy - 4, 6, 8);
+            } else if (gameState.district === 9) {
+                // City Hall columns
+                ctx.fillStyle = COLORS.civicColumn;
+                ctx.fillRect(sx + 2, sy, 8, TILE_SIZE);
+                ctx.fillRect(sx + TILE_SIZE - 10, sy, 8, TILE_SIZE);
+                ctx.fillStyle = COLORS.civicStone;
+                ctx.fillRect(sx, sy, TILE_SIZE, 4);
+                ctx.fillRect(sx, sy + TILE_SIZE - 4, TILE_SIZE, 4);
+            } else {
+                // Generic arch
+                ctx.fillStyle = COLORS.gateRed;
+                ctx.fillRect(sx, sy, 6, TILE_SIZE);
+                ctx.fillRect(sx + TILE_SIZE - 6, sy, 6, TILE_SIZE);
+                ctx.fillStyle = COLORS.gateGold;
+                ctx.fillRect(sx, sy, TILE_SIZE, 6);
+            }
+            break;
+        }
     }
 
     // === MESS OVERLAY ===
