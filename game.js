@@ -2207,49 +2207,63 @@ function drawNewsTicker() {
 // DRAWING - TITLE SCREEN
 // ============================================
 function drawTitleScreen() {
+    const cw = canvas.width;
+    const ch = canvas.height;
+
     // Background
     ctx.fillStyle = COLORS.uiBg;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, cw, ch);
 
-    // City skyline silhouette — buildings sit above the menu
-    const menuY = canvas.height * 0.48;
+    // Menu layout constants
+    const menuY = ch * 0.48;
     const menuSpacing = 42;
-    const dailyChallengeY = menuY + 3 * menuSpacing + 20; // bottom of Daily Challenge text + desc
-    drawCitySkyline(dailyChallengeY);
+    const bufferY = 20;
+    const backdropTop = menuY - bufferY;
+    const backdropBottom = menuY + 3 * menuSpacing + 22 + bufferY;
+    const backdropH = backdropBottom - backdropTop;
+    const backdropW = cw * 0.65;
+    const backdropX = (cw - backdropW) / 2;
+
+    // Sunrise gradient — warm glow behind the skyline
+    const sunCenterX = cw * 0.5;
+    const sunCenterY = backdropBottom;
+    const sunRadius = cw * 0.7;
+    const sunGrad = ctx.createRadialGradient(sunCenterX, sunCenterY, 0, sunCenterX, sunCenterY, sunRadius);
+    sunGrad.addColorStop(0, 'rgba(255,140,50,0.25)');
+    sunGrad.addColorStop(0.3, 'rgba(255,80,40,0.12)');
+    sunGrad.addColorStop(0.6, 'rgba(180,40,80,0.06)');
+    sunGrad.addColorStop(1, 'rgba(10,10,26,0)');
+    ctx.fillStyle = sunGrad;
+    ctx.fillRect(0, 0, cw, ch);
+
+    // City skyline — buildings bottom aligned with backdrop bottom
+    drawCitySkyline(backdropBottom);
 
     // Wordmark logo
     if (wordmarkImg.complete && wordmarkImg.naturalWidth > 0) {
-        const logoW = canvas.width * 0.55;
+        const logoW = cw * 0.55;
         const logoH = logoW * (wordmarkImg.naturalHeight / wordmarkImg.naturalWidth);
-        const logoX = (canvas.width - logoW) / 2;
-        const logoY = canvas.height * 0.04;
+        const logoX = (cw - logoW) / 2;
+        const logoY = ch * 0.04;
         ctx.drawImage(wordmarkImg, logoX, logoY, logoW, logoH);
 
         // Subtitle below logo
         ctx.fillStyle = COLORS.uiAccent;
-        ctx.font = `${Math.floor(canvas.width * 0.028)}px monospace`;
+        ctx.font = `${Math.floor(cw * 0.028)}px monospace`;
         ctx.textAlign = 'center';
-        ctx.fillText('San Francisco Needs You.', canvas.width / 2, logoY + logoH + 8);
+        ctx.fillText('San Francisco needs you before they wake up.', cw / 2, logoY + logoH + 8);
     } else {
         // Fallback text while loading
-        const titleY = canvas.height * 0.22;
+        const titleY = ch * 0.22;
         ctx.fillStyle = '#ff8040';
-        ctx.font = `bold ${Math.floor(canvas.width * 0.09)}px monospace`;
+        ctx.font = `bold ${Math.floor(cw * 0.09)}px monospace`;
         ctx.textAlign = 'center';
-        ctx.fillText('DOODY CALLS', canvas.width / 2, titleY);
+        ctx.fillText('DOODY CALLS', cw / 2, titleY);
 
         ctx.fillStyle = COLORS.uiAccent;
-        ctx.font = `${Math.floor(canvas.width * 0.028)}px monospace`;
-        ctx.fillText('San Francisco Needs You.', canvas.width / 2, titleY + 35);
+        ctx.font = `${Math.floor(cw * 0.028)}px monospace`;
+        ctx.fillText('San Francisco needs you before they wake up.', cw / 2, titleY + 35);
     }
-
-    // Menu backdrop — centered translucent box behind menu items
-    const bufferY = 20;
-    const backdropTop = menuY - bufferY;
-    const backdropBottom = menuY + 3 * menuSpacing + 22 + bufferY; // bottom of Daily Challenge + desc + buffer
-    const backdropH = backdropBottom - backdropTop;
-    const backdropW = canvas.width * 0.65;
-    const backdropX = (canvas.width - backdropW) / 2;
     ctx.fillStyle = 'rgba(10,10,26,0.65)';
     // Rounded rect
     const r = 8;
@@ -2284,13 +2298,13 @@ function drawTitleScreen() {
 
         ctx.globalAlpha = pulse;
         ctx.fillStyle = selected ? COLORS.uiAccent : '#888';
-        ctx.font = `bold ${Math.floor(canvas.width * 0.035)}px monospace`;
+        ctx.font = `bold ${Math.floor(cw * 0.035)}px monospace`;
         ctx.textAlign = 'center';
-        ctx.fillText(menuItems[i].label, canvas.width / 2, y);
+        ctx.fillText(menuItems[i].label, cw / 2, y);
 
         ctx.fillStyle = selected ? '#aaa' : '#555';
-        ctx.font = `${Math.floor(canvas.width * 0.02)}px monospace`;
-        ctx.fillText(menuItems[i].desc, canvas.width / 2, y + 18);
+        ctx.font = `${Math.floor(cw * 0.02)}px monospace`;
+        ctx.fillText(menuItems[i].desc, cw / 2, y + 18);
     }
     ctx.globalAlpha = 1;
 
@@ -2298,22 +2312,22 @@ function drawTitleScreen() {
     const arrowY = menuY + selectedIndex * menuSpacing - 5;
     const arrowBounce = Math.sin(animCache.time * 6) * 4;
     ctx.fillStyle = COLORS.uiAccent;
-    ctx.font = `${Math.floor(canvas.width * 0.035)}px monospace`;
+    ctx.font = `${Math.floor(cw * 0.035)}px monospace`;
     ctx.textAlign = 'right';
-    ctx.fillText('>', canvas.width / 2 - 120 + arrowBounce, arrowY);
+    ctx.fillText('>', cw / 2 - 120 + arrowBounce, arrowY);
 
     // Controls hint
     ctx.fillStyle = '#555';
     ctx.font = '10px monospace';
     ctx.textAlign = 'center';
     ctx.fillText('Arrow Keys / WASD to move  •  Space to clean  •  Enter to select',
-                 canvas.width / 2, canvas.height - 40);
+                 cw / 2, ch - 40);
 
     // Credits
     ctx.fillStyle = '#333';
     ctx.font = '9px monospace';
     ctx.fillText('A Kingmade LLC Production  •  Built by Marty\'s Belgian Dev Team',
-                 canvas.width / 2, canvas.height - 20);
+                 cw / 2, ch - 20);
 }
 
 function drawCitySkyline(bottomY) {
