@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOODY CALLS - San Francisco Needs You</title>
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="DOODY CALLS">
+    <meta property="og:description" content="San Francisco Needs You. Clean up the city before the morning commute.">
+    <meta property="og:type" content="website">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="DOODY CALLS">
+    <meta name="twitter:description" content="San Francisco Needs You. Clean up the city before the morning commute.">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+        }
+
+        #gameCanvas {
+            border: 3px solid #e94560;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            max-width: 100vw;
+            max-height: 100vh;
+            display: block;
+            margin: auto;
+        }
+
+        /* Fullscreen */
+        :fullscreen #gameCanvas,
+        :-webkit-full-screen #gameCanvas {
+            max-width: 100vw !important;
+            max-height: 100vh !important;
+            border: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="640" height="640"></canvas>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>

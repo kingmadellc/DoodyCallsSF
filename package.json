@@ -1,0 +1,11 @@
+{
+  "name": "doody-calls",
+  "version": "0.1.0",
+  "description": "DOODY CALLS - Clean up San Francisco before the morning commute",
+  "scripts": {
+    "start": "serve . -l 3000"
+  },
+  "dependencies": {
+    "serve": "^14.2.0"
+  }
+}
