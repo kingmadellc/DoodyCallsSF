@@ -117,7 +117,7 @@ const MESS = {
     PUDDLE: 2,
     GRAFFITI: 3,
     FOOD_WASTE: 4,
-    MYSTERY: 5,       // "mystery puddle" (Marty's story)
+    MYSTERY: 5,       // "mystery puddle"
 };
 
 // Cleanliness state per tile
@@ -164,7 +164,7 @@ const COLORS = {
     hotelAccent: '#c0a0d0',
     hotelSign: '#e0d0f0',
 
-    // Office (Amplitude)
+    // Office building
     officeWall: '#3a4a5a',
     officeAccent: '#60a0c0',
 
@@ -233,7 +233,7 @@ const DISTRICTS = [
         palette: { accent: '#c0a040', sky: '#3a2a4a' }
     },
     {
-        id: 3, name: "The W Hotel / SoMa", subtitle: "Marty's Morning Walk",
+        id: 3, name: "SoMa", subtitle: "The Morning Commute",
         timer: 120, messCount: 30, pigeonCount: 3, hoboCount: 2,
         palette: { accent: '#a060c0', sky: '#2a1a3e' }
     },
@@ -281,7 +281,7 @@ const NEWS_HEADLINES = [
     "BREAKING: Local sanitation worker seen spraying pigeons with power washer",
     "Pleasanton resident describes SF commute as 'an adventure game'",
     "AI startup claims it can clean streets; demo crashes immediately",
-    "Belgian development team announces city cleanup simulator",
+    "Indie development team announces city cleanup simulator",
     "AI sweat shop produces game overnight, union files complaint",
     "Tech bro on electric scooter leaves trail of destruction, claims 'disrupting sanitation'",
     "Man counts 2 human situations on short walk to coffee shop",
@@ -291,8 +291,8 @@ const NEWS_HEADLINES = [
     "City deploys experimental zamboni on Tenderloin sidewalks",
     "Pigeon flock organized, demands union representation",
     "Mime trapped behind invisible wall, sanitation worker walks around",
-    "W Hotel guest shocked by alley conditions at 7AM coffee run",
-    "Amplitude employee spotted walking to office without hazmat suit",
+    "Hotel guest shocked by alley conditions at 7AM coffee run",
+    "Tech worker spotted walking to office without hazmat suit",
     "Cable car derails into artisanal sourdough display, nobody injured",
     "SF ranked dirtiest city for 47th consecutive year",
     "Governor deploys one (1) additional broom to Tenderloin",
@@ -326,27 +326,27 @@ const CHARACTERS = [
         abilityDesc: 'No special ability',
     },
     {
-        id: 'mike', name: 'The Commuter', desc: 'Mike Dean — knows every shortcut',
+        id: 'commuter', name: 'The Commuter', desc: 'Knows every shortcut in the city',
         color: '#3080d0', visorColor: '#60e0ff', ability: 'speed',
         abilityDesc: '+20% move speed',
     },
     {
-        id: 'marty', name: 'The Tourist', desc: 'Marty — coffee-powered, scared of alleys',
+        id: 'tourist', name: 'The Tourist', desc: 'Coffee-powered, scared of alleys',
         color: '#d06030', visorColor: '#ff8040', ability: 'clean',
         abilityDesc: 'Auto-clean is faster (skip DIRTY state)',
     },
     {
-        id: 'gabe', name: 'The Analyst', desc: 'Gabe — sees the optimal path',
+        id: 'analyst', name: 'The Analyst', desc: 'Sees the optimal cleaning path',
         color: '#40b060', visorColor: '#80ff80', ability: 'reveal',
         abilityDesc: 'Messes flash on minimap',
     },
     {
-        id: 'paul', name: 'The Globetrotter', desc: 'Paul Knight — riot gear ready',
+        id: 'globetrotter', name: 'The Globetrotter', desc: 'World traveler, riot gear ready',
         color: '#8040c0', visorColor: '#c080ff', ability: 'armor',
         abilityDesc: 'Immune to first earthquake',
     },
     {
-        id: 'kyle', name: 'The Scout', desc: 'Kyle Fuson — reveals the whole map',
+        id: 'scout', name: 'The Scout', desc: 'Reveals the whole map ahead of time',
         color: '#c0c040', visorColor: '#ffff80', ability: 'scout',
         abilityDesc: '+30s time on first district',
     },
@@ -425,7 +425,7 @@ let gameState = {
     earthquakeTimer: 0,
     earthquakeActive: false,
     earthquakeCooldown: 0,
-    earthquakeImmune: false,  // Paul's ability
+    earthquakeImmune: false,  // Globetrotter's ability
 
     // Particles & celebrations
     particles: [],
@@ -611,14 +611,14 @@ function generateCityBlock(districtIndex) {
 
     // === DISTRICT-SPECIFIC FEATURES ===
     if (districtIndex === 2) {
-        // District 3: The W Hotel / SoMa
-        // The W Hotel - top right
+        // District 3: SoMa
+        // Hotel - top right
         for (let y = 0; y < 4; y++) {
             for (let x = 15; x < 19; x++) {
                 tiles[y][x] = TILE.HOTEL;
             }
         }
-        // Amplitude Office - across the street
+        // Tech office - across the street
         for (let y = 0; y < 4; y++) {
             for (let x = 20; x < 24; x++) {
                 tiles[y][x] = TILE.OFFICE;
@@ -835,7 +835,7 @@ function tryCleanTile(x, y) {
         const prevState = gameState.cleanState[y][x];
         const char = CHARACTERS[gameState.selectedCharacter];
 
-        // Marty's ability: skip DIRTY state, go straight to CLEAN
+        // Tourist's ability: skip DIRTY state, go straight to CLEAN
         if (char.ability === 'clean' && prevState === CLEAN_STATE.FILTHY) {
             gameState.cleanState[y][x] = CLEAN_STATE.CLEAN;
             gameState.messesClean++;
@@ -1292,7 +1292,7 @@ function updateEarthquake(dt) {
         gameState.earthquakeTimer = 1.5 + Math.random() * 1.0; // 1.5-2.5s duration
         gameState.earthquakeCooldown = 0;
 
-        // Paul's armor ability: immune to first earthquake
+        // Globetrotter's armor ability: immune to first earthquake
         if (gameState.earthquakeImmune) {
             gameState.earthquakeImmune = false;
             addCelebration('QUAKE BLOCKED!', gameState.player.x, gameState.player.y - 2, '#8040c0', true);
@@ -1462,7 +1462,7 @@ function startDistrict(districtIndex) {
     const char = CHARACTERS[gameState.selectedCharacter];
 
     let timer = dist.timer;
-    // Kyle's ability: +30s on first district
+    // Scout's ability: +30s on first district
     if (char.ability === 'scout' && districtIndex === 0) timer += 30;
 
     gameState.timer = timer;
@@ -1494,7 +1494,7 @@ function startDistrict(districtIndex) {
     gameState.earthquakeTimer = 0;
     gameState.earthquakeActive = false;
     gameState.earthquakeCooldown = 15 + Math.random() * 10; // First quake after 15-25s
-    gameState.earthquakeImmune = char.ability === 'armor'; // Paul
+    gameState.earthquakeImmune = char.ability === 'armor'; // Globetrotter
 
     // Generate level
     generateCityBlock(districtIndex);
@@ -1587,7 +1587,7 @@ function getGradeHeadline(grade) {
         'B': 'Real Estate Prices Somehow Increase Further',
         'B+': 'Food Truck Owners Report Record Sales on Cleaner Streets',
         'A': 'SF Named "Most Improved" — Residents Suspicious',
-        'A+': 'Mike Dean Spotted Walking to Office Without Hazmat Suit',
+        'A+': 'Tech Worker Spotted Walking to Office Without Hazmat Suit',
     };
     return headlines[grade] || headlines['F'];
 }
@@ -1701,7 +1701,7 @@ function drawTile(x, y) {
             ctx.strokeStyle = COLORS.officeAccent;
             ctx.lineWidth = 1;
             ctx.strokeRect(sx + 3, sy + 3, TILE_SIZE - 6, TILE_SIZE - 6);
-            // "A" logo hint on first tile (Amplitude)
+            // Logo hint on first tile
             if (x === 20 && y === 0) {
                 ctx.fillStyle = COLORS.officeAccent;
                 ctx.font = `${Math.floor(TILE_SIZE * 0.5)}px monospace`;
@@ -2393,7 +2393,7 @@ function drawTitleScreen() {
     ctx.globalAlpha = 0.5;
     ctx.fillStyle = '#384050';
     ctx.font = `${Math.floor(cw * 0.015)}px monospace`;
-    ctx.fillText('A Kingmade LLC Production  |  Built by Marty\'s Belgian Dev Team',
+    ctx.fillText('A Kingmade LLC Production  |  Built with love in San Francisco',
                  cw / 2, ch - 18);
     ctx.globalAlpha = 1;
 }
