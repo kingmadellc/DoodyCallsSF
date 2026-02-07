@@ -317,6 +317,60 @@ const GAME_OVER_HEADLINES = [
 ];
 
 // ============================================
+// CHARACTERS (friend group)
+// ============================================
+const CHARACTERS = [
+    {
+        id: 'default', name: 'The Rookie', desc: 'Standard issue sanitation worker',
+        color: '#f0a030', visorColor: '#40c0e0', ability: 'none',
+        abilityDesc: 'No special ability',
+    },
+    {
+        id: 'mike', name: 'The Commuter', desc: 'Mike Dean — knows every shortcut',
+        color: '#3080d0', visorColor: '#60e0ff', ability: 'speed',
+        abilityDesc: '+20% move speed',
+    },
+    {
+        id: 'marty', name: 'The Tourist', desc: 'Marty — coffee-powered, scared of alleys',
+        color: '#d06030', visorColor: '#ff8040', ability: 'clean',
+        abilityDesc: 'Auto-clean is faster (skip DIRTY state)',
+    },
+    {
+        id: 'gabe', name: 'The Analyst', desc: 'Gabe — sees the optimal path',
+        color: '#40b060', visorColor: '#80ff80', ability: 'reveal',
+        abilityDesc: 'Messes flash on minimap',
+    },
+    {
+        id: 'paul', name: 'The Globetrotter', desc: 'Paul Knight — riot gear ready',
+        color: '#8040c0', visorColor: '#c080ff', ability: 'armor',
+        abilityDesc: 'Immune to first earthquake',
+    },
+    {
+        id: 'kyle', name: 'The Scout', desc: 'Kyle Fuson — reveals the whole map',
+        color: '#c0c040', visorColor: '#ffff80', ability: 'scout',
+        abilityDesc: '+30s time on first district',
+    },
+];
+
+// ============================================
+// NEAR-MISS / CLUTCH HEADLINES
+// ============================================
+const NEAR_MISS_HEADLINES = [
+    "SO CLOSE — Commuters Rate City 'Almost Tolerable'",
+    "ONE SPOT LEFT — Sanitation Worker Breaks Down Crying",
+    "99% CLEAN — Lone Pigeon Ruins Everything",
+    "ALMOST PERFECT — City Awards 'Participation Trophy'",
+    "HEARTBREAK — One mess away from perfection",
+];
+
+const CLUTCH_HEADLINES = [
+    "BUZZER BEATER — Cleaned with seconds to spare!",
+    "PHOTO FINISH — District saved at the last moment!",
+    "CLUTCH CLEAN — Sanitation worker becomes local hero!",
+    "MIRACLE SHIFT — Nobody believed it was possible!",
+];
+
+// ============================================
 // ASSETS
 // ============================================
 const wordmarkImg = new Image();
@@ -327,11 +381,14 @@ wordmarkImg.src = 'assets/wordmark.png';
 // ============================================
 let gameState = {
     // Core
-    screen: 'title',  // title, playing, paused, gameOver, districtComplete, allComplete
+    screen: 'title',  // title, playing, paused, gameOver, districtComplete, allComplete, charSelect, districtSelect
     district: 0,       // Index into DISTRICTS array
     timer: 120,
     started: false,
     animationTime: 0,
+
+    // Character
+    selectedCharacter: 0,  // Index into CHARACTERS
 
     // Player
     player: {
@@ -360,6 +417,15 @@ let gameState = {
     messesClean: 0,
     timeBonus: 0,
     pigeonsSprayed: 0,
+    hazardsDodged: 0,
+    clutchFinish: false,   // finished with <5s left
+    nearMiss: false,       // finished 95-99% clean
+
+    // Earthquake
+    earthquakeTimer: 0,
+    earthquakeActive: false,
+    earthquakeCooldown: 0,
+    earthquakeImmune: false,  // Paul's ability
 
     // Particles & celebrations
     particles: [],
@@ -367,8 +433,17 @@ let gameState = {
 
     // Progression
     districtStars: {},     // { districtId: stars }
+    districtBests: {},     // { districtId: { pct, time, stars } }
     cityGrade: 'F',
     totalStars: 0,
+    districtsUnlocked: 1,  // How many districts are unlocked
+
+    // Headlines collection
+    headlinesSeen: [],     // Array of headline strings the player has earned
+
+    // Daily district
+    dailyPlayed: false,
+    dailySeed: 0,
 
     // News ticker
     tickerOffset: 0,
@@ -376,6 +451,10 @@ let gameState = {
 
     // Screen shake
     shake: { x: 0, y: 0, intensity: 0, timer: 0 },
+
+    // Score sharing
+    lastScoreText: '',    // Generated score text for clipboard
+    scoreCopied: false,
 };
 
 // ============================================
@@ -722,7 +801,7 @@ function updatePlayer(dt) {
             !isBlockingTile(gameState.tiles[ny][nx])) {
             p.x = nx;
             p.y = ny;
-            p.moveTimer = MOVE_DELAY / 1000;
+            p.moveTimer = (MOVE_DELAY / 1000) * p.speed;
 
             // Auto-clean when walking over messy tiles
             tryCleanTile(nx, ny);
@@ -754,6 +833,17 @@ function tryCleanTile(x, y) {
         gameState.cleanState[y][x] !== CLEAN_STATE.SPARKLING) {
 
         const prevState = gameState.cleanState[y][x];
+        const char = CHARACTERS[gameState.selectedCharacter];
+
+        // Marty's ability: skip DIRTY state, go straight to CLEAN
+        if (char.ability === 'clean' && prevState === CLEAN_STATE.FILTHY) {
+            gameState.cleanState[y][x] = CLEAN_STATE.CLEAN;
+            gameState.messesClean++;
+            spawnCleanParticles(x, y, COLORS.uiClean);
+            addCelebration('+10', x, y, COLORS.uiClean);
+            checkCleanMilestones();
+            return;
+        }
 
         if (prevState === CLEAN_STATE.FILTHY) {
             gameState.cleanState[y][x] = CLEAN_STATE.DIRTY;
@@ -1172,6 +1262,163 @@ function updateShake(dt) {
 }
 
 // ============================================
+// EARTHQUAKE SYSTEM
+// ============================================
+function updateEarthquake(dt) {
+    if (gameState.screen !== 'playing') return;
+
+    gameState.earthquakeCooldown -= dt;
+    if (gameState.earthquakeCooldown > 0) return;
+
+    // Random earthquake chance (increases in later districts)
+    const distIdx = gameState.district;
+    const quakeChance = (0.003 + distIdx * 0.002) * dt; // ~every 30-60s on avg
+
+    if (gameState.earthquakeActive) {
+        gameState.earthquakeTimer -= dt;
+        if (gameState.earthquakeTimer <= 0) {
+            gameState.earthquakeActive = false;
+            gameState.earthquakeCooldown = 20 + Math.random() * 15; // 20-35s cooldown
+        } else {
+            // During earthquake: shake intensely, scatter some messes
+            triggerShake(0.05, 6);
+        }
+        return;
+    }
+
+    if (Math.random() < quakeChance) {
+        // Trigger earthquake!
+        gameState.earthquakeActive = true;
+        gameState.earthquakeTimer = 1.5 + Math.random() * 1.0; // 1.5-2.5s duration
+        gameState.earthquakeCooldown = 0;
+
+        // Paul's armor ability: immune to first earthquake
+        if (gameState.earthquakeImmune) {
+            gameState.earthquakeImmune = false;
+            addCelebration('QUAKE BLOCKED!', gameState.player.x, gameState.player.y - 2, '#8040c0', true);
+            gameState.earthquakeActive = false;
+            gameState.earthquakeCooldown = 30;
+            return;
+        }
+
+        addCelebration('EARTHQUAKE!', gameState.player.x, gameState.player.y - 2, '#ff4444', true);
+        triggerShake(1.5, 12);
+
+        // Scatter 3-6 new messes randomly
+        const messCount = 3 + Math.floor(Math.random() * 4);
+        let placed = 0;
+        let attempts = 0;
+        while (placed < messCount && attempts < 50) {
+            attempts++;
+            const x = Math.floor(Math.random() * MAP_WIDTH);
+            const y = Math.floor(Math.random() * MAP_HEIGHT);
+            if (isCleanableTile(gameState.tiles[y][x]) && gameState.messes[y][x] === MESS.NONE) {
+                gameState.messes[y][x] = MESS.LITTER;
+                gameState.cleanState[y][x] = CLEAN_STATE.DIRTY;
+                gameState.totalMesses++;
+                spawnSplatParticles(x, y);
+                placed++;
+            }
+        }
+    }
+}
+
+// ============================================
+// LAST-SECOND PIGEON RAMP-UP
+// ============================================
+function updatePigeonFrenzy(dt) {
+    if (gameState.screen !== 'playing') return;
+    if (gameState.timer > 15) return; // Only in final 15 seconds
+
+    // Pigeons bomb more frequently as time runs out
+    const urgency = 1 - (gameState.timer / 15); // 0 to 1
+    for (const pig of gameState.pigeons) {
+        if (pig.state === 'idle' || pig.state === 'walking') {
+            // Accelerate bomb timer
+            pig.bombTimer -= dt * urgency * 3;
+        }
+    }
+    // Hobos also get antsy
+    for (const hobo of gameState.hobos) {
+        if (hobo.state === 'wandering') {
+            hobo.poopTimer -= dt * urgency * 2;
+        }
+    }
+}
+
+// ============================================
+// SCORE SHARING (WORDLE-STYLE)
+// ============================================
+function generateScoreText(stars) {
+    const district = DISTRICTS[gameState.district];
+    const pct = gameState.totalMesses > 0 ?
+        Math.floor((gameState.messesClean / gameState.totalMesses) * 100) : 0;
+    const timeLeft = Math.floor(Math.max(0, gameState.timeBonus));
+    const starStr = '\u2B50'.repeat(stars) + '\u2606'.repeat(3 - stars);
+    const char = CHARACTERS[gameState.selectedCharacter];
+
+    let headline = getGradeHeadline(gameState.cityGrade);
+    if (gameState.clutchFinish) headline = CLUTCH_HEADLINES[Math.floor(Math.random() * CLUTCH_HEADLINES.length)];
+    else if (gameState.nearMiss) headline = NEAR_MISS_HEADLINES[Math.floor(Math.random() * NEAR_MISS_HEADLINES.length)];
+
+    const lines = [
+        `DOODY CALLS - D${district.id}: ${district.name}`,
+        `${starStr} | Cleaned: ${pct}% | Time: ${timeLeft}s left`,
+        `Character: ${char.name} | Grade: ${gameState.cityGrade}`,
+        `"${headline}"`,
+        ``,
+        `https://kingmadellc.github.io/DoodyCallsSF/`,
+    ];
+    return lines.join('\n');
+}
+
+function copyScoreToClipboard() {
+    const text = gameState.lastScoreText;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            gameState.scoreCopied = true;
+        }).catch(() => {
+            fallbackCopy(text);
+        });
+    } else {
+        fallbackCopy(text);
+    }
+}
+
+function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); gameState.scoreCopied = true; } catch (e) {}
+    document.body.removeChild(ta);
+}
+
+// ============================================
+// DAILY DISTRICT
+// ============================================
+function getDailySeed() {
+    const d = new Date();
+    return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+}
+
+function getDailyDistrictIndex() {
+    const seed = getDailySeed();
+    return seed % DISTRICTS.length;
+}
+
+// Seeded random for daily levels
+function seededRandom(seed) {
+    let s = seed;
+    return function() {
+        s = (s * 1664525 + 1013904223) & 0xFFFFFFFF;
+        return (s >>> 0) / 0xFFFFFFFF;
+    };
+}
+
+// ============================================
 // CAMERA
 // ============================================
 function updateCamera(dt) {
@@ -1203,13 +1450,22 @@ function updateTimer(dt) {
         gameState.timeBonus = 0;
         gameState.screen = 'gameOver';
         triggerShake(0.5, 12);
+        // Generate score text for sharing
+        gameState.lastScoreText = generateScoreText(0);
+        gameState.scoreCopied = false;
     }
 }
 
 function startDistrict(districtIndex) {
     gameState.district = districtIndex;
     const dist = DISTRICTS[districtIndex];
-    gameState.timer = dist.timer;
+    const char = CHARACTERS[gameState.selectedCharacter];
+
+    let timer = dist.timer;
+    // Kyle's ability: +30s on first district
+    if (char.ability === 'scout' && districtIndex === 0) timer += 30;
+
+    gameState.timer = timer;
     gameState.screen = 'playing';
     gameState.started = true;
 
@@ -1220,11 +1476,25 @@ function startDistrict(districtIndex) {
     gameState.player.visualY = 20;
     gameState.player.moveTimer = 0;
 
+    // Character speed ability
+    gameState.player.speed = char.ability === 'speed' ? 0.8 : 1.0; // lower moveTimer = faster
+
     // Reset stats
     gameState.pigeonsSprayed = 0;
+    gameState.hazardsDodged = 0;
+    gameState.clutchFinish = false;
+    gameState.nearMiss = false;
+    gameState.scoreCopied = false;
+    gameState.lastScoreText = '';
     gameState._milestone50 = false;
     gameState._milestone75 = false;
     gameState._milestone100 = false;
+
+    // Earthquake state
+    gameState.earthquakeTimer = 0;
+    gameState.earthquakeActive = false;
+    gameState.earthquakeCooldown = 15 + Math.random() * 10; // First quake after 15-25s
+    gameState.earthquakeImmune = char.ability === 'armor'; // Paul
 
     // Generate level
     generateCityBlock(districtIndex);
@@ -1236,7 +1506,17 @@ function startDistrict(districtIndex) {
 
 function completeDistrict() {
     const pct = gameState.totalMesses > 0 ? (gameState.messesClean / gameState.totalMesses) : 0;
+    const pctInt = Math.floor(pct * 100);
     const timeLeft = gameState.timer;
+
+    // Clutch / near-miss detection
+    gameState.clutchFinish = timeLeft > 0 && timeLeft < 5 && pct >= 0.6;
+    gameState.nearMiss = pctInt >= 95 && pctInt < 100;
+
+    if (gameState.clutchFinish) {
+        addCelebration('CLUTCH!', gameState.player.x, gameState.player.y - 2, '#ffdd44', true);
+        triggerShake(0.4, 10);
+    }
 
     let stars = 0;
     if (pct >= 0.6) stars = 1;
@@ -1249,6 +1529,20 @@ function completeDistrict() {
         gameState.districtStars[distId] = stars;
     }
 
+    // Personal best tracking
+    const prevBest = gameState.districtBests[distId];
+    if (!prevBest || pctInt > prevBest.pct || (pctInt === prevBest.pct && timeLeft > prevBest.time)) {
+        gameState.districtBests[distId] = { pct: pctInt, time: Math.floor(timeLeft), stars };
+    }
+
+    // Unlock next district
+    if (stars >= 1 && gameState.district + 1 < DISTRICTS.length) {
+        const nextUnlock = gameState.district + 2; // district index + 1 = districtId, +1 for next
+        if (nextUnlock > gameState.districtsUnlocked) {
+            gameState.districtsUnlocked = nextUnlock;
+        }
+    }
+
     // Recalculate total stars and grade
     let total = 0;
     for (const key in gameState.districtStars) {
@@ -1257,8 +1551,19 @@ function completeDistrict() {
     gameState.totalStars = total;
     gameState.cityGrade = calculateGrade(total);
 
+    // Collect headline
+    const headline = getGradeHeadline(gameState.cityGrade);
+    if (!gameState.headlinesSeen.includes(headline)) {
+        gameState.headlinesSeen.push(headline);
+    }
+
     gameState.timeBonus = Math.floor(timeLeft);
     gameState.screen = 'districtComplete';
+
+    // Generate score share text
+    gameState.lastScoreText = generateScoreText(stars);
+    gameState.scoreCopied = false;
+
     saveProgress();
 }
 
@@ -1548,16 +1853,17 @@ function drawPlayer() {
     ctx.ellipse(sx + TILE_SIZE / 2, sy + TILE_SIZE - 2, TILE_SIZE / 3, 3, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Body (hazmat suit)
-    ctx.fillStyle = COLORS.playerBody;
+    // Body (hazmat suit) - uses character color
+    const char = CHARACTERS[gameState.selectedCharacter];
+    ctx.fillStyle = char.color;
     ctx.fillRect(sx + 6, sy + 6 + bounce, TILE_SIZE - 12, TILE_SIZE - 10);
 
     // Head
-    ctx.fillStyle = COLORS.playerBody;
+    ctx.fillStyle = char.color;
     ctx.fillRect(sx + 8, sy + 2 + bounce, TILE_SIZE - 16, 8);
 
     // Visor
-    ctx.fillStyle = COLORS.playerVisor;
+    ctx.fillStyle = char.visorColor;
     const visorShine = 0.7 + Math.sin(animCache.time * 3) * 0.15;
     ctx.globalAlpha = visorShine;
     if (p.direction === 0) {
@@ -1828,6 +2134,17 @@ function drawHUD() {
     ctx.fillStyle = pct >= 100 ? COLORS.uiGold : COLORS.uiClean;
     ctx.fillRect(0, barY, fillW, barH);
 
+    // Earthquake warning
+    if (gameState.earthquakeActive) {
+        const quakeFlash = Math.sin(animCache.time * 16) * 0.4 + 0.4;
+        ctx.fillStyle = `rgba(200, 100, 0, ${quakeFlash})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#ff8800';
+        ctx.font = 'bold 16px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('EARTHQUAKE!', canvas.width / 2, canvas.height / 2 - 20);
+    }
+
     // === NEWS TICKER at bottom ===
     drawNewsTicker();
 
@@ -1924,20 +2241,22 @@ function drawTitleScreen() {
     }
 
     // Menu backdrop (dims skyline behind menu for readability)
-    const menuY = canvas.height * 0.52;
-    const menuSpacing = 50;
-    const backdropGrad = ctx.createLinearGradient(0, menuY - 30, 0, menuY + menuSpacing * 3 + 10);
+    const menuY = canvas.height * 0.48;
+    const menuSpacing = 42;
+    const backdropGrad = ctx.createLinearGradient(0, menuY - 30, 0, menuY + menuSpacing * 4 + 10);
     backdropGrad.addColorStop(0, 'rgba(10,10,26,0)');
     backdropGrad.addColorStop(0.15, 'rgba(10,10,26,0.7)');
     backdropGrad.addColorStop(1, 'rgba(10,10,26,0.7)');
     ctx.fillStyle = backdropGrad;
-    ctx.fillRect(0, menuY - 30, canvas.width, menuSpacing * 3 + 40);
+    ctx.fillRect(0, menuY - 30, canvas.width, menuSpacing * 4 + 40);
 
     // Menu options
+    const dailyDist = DISTRICTS[getDailyDistrictIndex()];
     const menuItems = [
         { label: 'START SHIFT', desc: 'Begin District 1' },
-        { label: 'QUICK SHIFT', desc: '3 random districts' },
-        { label: 'DISTRICT SELECT', desc: `City Grade: ${gameState.cityGrade}` },
+        { label: 'QUICK SHIFT', desc: 'Random district' },
+        { label: 'DISTRICT SELECT', desc: `${gameState.districtsUnlocked}/${DISTRICTS.length} unlocked • Grade: ${gameState.cityGrade}` },
+        { label: 'DAILY CHALLENGE', desc: `Today: ${dailyDist.name}` },
     ];
 
     const selectedIndex = gameState._menuIndex || 0;
@@ -1986,38 +2305,38 @@ function drawCitySkyline() {
     const cw = canvas.width;
     const ch = canvas.height;
 
-    // Back row (distant, dimmer) - wide variety of widths and heights
+    // Back row (distant, dimmer) - tall enough to go behind logo
     const backBuildings = [
-        { x: 0.00, w: 0.05, h: 0.32 },
-        { x: 0.06, w: 0.10, h: 0.48 },
-        { x: 0.17, w: 0.04, h: 0.36 },
-        { x: 0.22, w: 0.08, h: 0.55 },
-        { x: 0.31, w: 0.05, h: 0.40 },
-        { x: 0.37, w: 0.12, h: 0.60 },  // Wide tower - center
-        { x: 0.50, w: 0.04, h: 0.44 },
-        { x: 0.55, w: 0.09, h: 0.52 },
-        { x: 0.65, w: 0.06, h: 0.35 },
-        { x: 0.72, w: 0.11, h: 0.50 },
-        { x: 0.84, w: 0.04, h: 0.38 },
-        { x: 0.89, w: 0.07, h: 0.45 },
-        { x: 0.97, w: 0.04, h: 0.33 },
+        { x: 0.00, w: 0.05, h: 0.55 },
+        { x: 0.06, w: 0.10, h: 0.75 },
+        { x: 0.17, w: 0.04, h: 0.60 },
+        { x: 0.22, w: 0.08, h: 0.82 },
+        { x: 0.31, w: 0.05, h: 0.65 },
+        { x: 0.37, w: 0.12, h: 0.88 },  // Wide tower - center
+        { x: 0.50, w: 0.04, h: 0.68 },
+        { x: 0.55, w: 0.09, h: 0.80 },
+        { x: 0.65, w: 0.06, h: 0.58 },
+        { x: 0.72, w: 0.11, h: 0.78 },
+        { x: 0.84, w: 0.04, h: 0.62 },
+        { x: 0.89, w: 0.07, h: 0.70 },
+        { x: 0.97, w: 0.04, h: 0.55 },
     ];
 
     // Front row (closer, brighter, shorter) - mixed silhouettes
     const frontBuildings = [
-        { x: 0.00, w: 0.10, h: 0.20 },
-        { x: 0.11, w: 0.04, h: 0.32 },
-        { x: 0.16, w: 0.07, h: 0.24 },
-        { x: 0.24, w: 0.11, h: 0.35 },
-        { x: 0.36, w: 0.05, h: 0.27 },
-        { x: 0.42, w: 0.09, h: 0.38 },
-        { x: 0.52, w: 0.04, h: 0.30 },
-        { x: 0.57, w: 0.08, h: 0.22 },
-        { x: 0.66, w: 0.05, h: 0.34 },
-        { x: 0.72, w: 0.10, h: 0.26 },
-        { x: 0.83, w: 0.04, h: 0.31 },
-        { x: 0.88, w: 0.08, h: 0.20 },
-        { x: 0.97, w: 0.04, h: 0.28 },
+        { x: 0.00, w: 0.10, h: 0.38 },
+        { x: 0.11, w: 0.04, h: 0.55 },
+        { x: 0.16, w: 0.07, h: 0.42 },
+        { x: 0.24, w: 0.11, h: 0.58 },
+        { x: 0.36, w: 0.05, h: 0.45 },
+        { x: 0.42, w: 0.09, h: 0.62 },
+        { x: 0.52, w: 0.04, h: 0.50 },
+        { x: 0.57, w: 0.08, h: 0.40 },
+        { x: 0.66, w: 0.05, h: 0.56 },
+        { x: 0.72, w: 0.10, h: 0.44 },
+        { x: 0.83, w: 0.04, h: 0.52 },
+        { x: 0.88, w: 0.08, h: 0.38 },
+        { x: 0.97, w: 0.04, h: 0.48 },
     ];
 
     function drawBuildingRow(buildings, bodyColor, winGapX, winGapY, winW, winH) {
@@ -2097,7 +2416,7 @@ function drawGameOverScreen() {
                  canvas.width / 2, canvas.height * 0.50);
 
     // Score share preview
-    drawScoreShare(canvas.width * 0.15, canvas.height * 0.57, canvas.width * 0.7, 80, 0);
+    drawScoreShare(canvas.width * 0.15, canvas.height * 0.55, canvas.width * 0.7, 90, 0);
 
     // Prompt
     const blink = Math.sin(animCache.time * 4) > 0;
@@ -2161,7 +2480,7 @@ function drawDistrictCompleteScreen() {
     wrapText(getGradeHeadline(gameState.cityGrade), canvas.width / 2, statsY + 75, canvas.width * 0.8, 14);
 
     // Score share
-    drawScoreShare(canvas.width * 0.15, canvas.height * 0.70, canvas.width * 0.7, 80, stars);
+    drawScoreShare(canvas.width * 0.15, canvas.height * 0.68, canvas.width * 0.7, 90, stars);
 
     // Next prompt
     const blink = Math.sin(animCache.time * 4) > 0;
@@ -2181,26 +2500,227 @@ function drawDistrictCompleteScreen() {
 function drawScoreShare(x, y, w, h, stars) {
     // Share card background
     ctx.fillStyle = '#1a1a2e';
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = gameState.scoreCopied ? '#4ecdc4' : '#333';
+    ctx.lineWidth = gameState.scoreCopied ? 2 : 1;
     ctx.fillRect(x, y, w, h);
     ctx.strokeRect(x, y, w, h);
 
     const district = DISTRICTS[gameState.district];
     const pct = gameState.totalMesses > 0 ?
         Math.floor((gameState.messesClean / gameState.totalMesses) * 100) : 0;
+    const char = CHARACTERS[gameState.selectedCharacter];
 
     ctx.fillStyle = '#888';
     ctx.font = '9px monospace';
     ctx.textAlign = 'left';
-    ctx.fillText('DOODY CALLS — copy & share:', x + 8, y + 14);
+
+    if (gameState.scoreCopied) {
+        ctx.fillStyle = COLORS.uiAccent;
+        ctx.fillText('COPIED TO CLIPBOARD!', x + 8, y + 14);
+    } else {
+        ctx.fillText('Press C to copy score & share:', x + 8, y + 14);
+    }
 
     ctx.fillStyle = '#aaa';
     ctx.font = '9px monospace';
-    const starStr = '★'.repeat(stars) + '☆'.repeat(3 - stars);
+    const starStr = '\u2605'.repeat(stars) + '\u2606'.repeat(3 - stars);
     ctx.fillText(`DOODY CALLS - D${district.id}: ${district.name}`, x + 8, y + 30);
     ctx.fillText(`${starStr} | Cleaned: ${pct}% | Time: ${Math.floor(gameState.timeBonus)}s left`, x + 8, y + 44);
-    ctx.fillText(`Grade: ${gameState.cityGrade} ("${getGradeHeadline(gameState.cityGrade).substring(0, 45)}...")`, x + 8, y + 58);
+    ctx.fillText(`${char.name} | Grade: ${gameState.cityGrade}`, x + 8, y + 58);
+
+    // Near-miss or clutch indicator
+    if (gameState.clutchFinish) {
+        ctx.fillStyle = '#ffdd44';
+        ctx.fillText('CLUTCH FINISH!', x + 8, y + 72);
+    } else if (gameState.nearMiss) {
+        ctx.fillStyle = '#ff8888';
+        ctx.fillText('SO CLOSE...', x + 8, y + 72);
+    }
+}
+
+// ============================================
+// DRAWING - CHARACTER SELECT
+// ============================================
+function drawCharSelectScreen() {
+    ctx.fillStyle = COLORS.uiBg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    drawCitySkyline();
+
+    // Title
+    ctx.fillStyle = COLORS.uiAccent;
+    ctx.font = `bold ${Math.floor(canvas.width * 0.045)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText('CHOOSE YOUR WORKER', canvas.width / 2, canvas.height * 0.12);
+
+    const idx = gameState._charIndex || 0;
+    const char = CHARACTERS[idx];
+
+    // Character preview (big hazmat suit)
+    const previewX = canvas.width / 2;
+    const previewY = canvas.height * 0.35;
+    const sz = 64;
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(previewX, previewY + sz / 2 + 4, sz / 2, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body
+    ctx.fillStyle = char.color;
+    ctx.fillRect(previewX - sz / 3, previewY - sz / 3, sz * 2 / 3, sz * 2 / 3);
+
+    // Head
+    ctx.fillRect(previewX - sz / 4, previewY - sz / 2, sz / 2, sz / 3);
+
+    // Visor
+    ctx.fillStyle = char.visorColor;
+    ctx.fillRect(previewX - sz / 5, previewY - sz / 2 + 8, sz * 2 / 5, sz / 6);
+
+    // Boots
+    ctx.fillStyle = '#3a3a3a';
+    ctx.fillRect(previewX - sz / 3, previewY + sz / 3 - 4, sz / 4, 8);
+    ctx.fillRect(previewX + sz / 12, previewY + sz / 3 - 4, sz / 4, 8);
+
+    // Name
+    ctx.fillStyle = char.color;
+    ctx.font = `bold ${Math.floor(canvas.width * 0.04)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(char.name, previewX, previewY + sz / 2 + 35);
+
+    // Description
+    ctx.fillStyle = '#aaa';
+    ctx.font = `${Math.floor(canvas.width * 0.022)}px monospace`;
+    ctx.fillText(char.desc, previewX, previewY + sz / 2 + 55);
+
+    // Ability
+    ctx.fillStyle = COLORS.uiGold;
+    ctx.font = `bold ${Math.floor(canvas.width * 0.02)}px monospace`;
+    ctx.fillText(`Ability: ${char.abilityDesc}`, previewX, previewY + sz / 2 + 75);
+
+    // Left/right arrows
+    const arrowBounce = Math.sin(animCache.time * 6) * 4;
+    ctx.fillStyle = COLORS.uiAccent;
+    ctx.font = `bold ${Math.floor(canvas.width * 0.06)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText('<', canvas.width * 0.12 + arrowBounce, previewY + 5);
+    ctx.fillText('>', canvas.width * 0.88 - arrowBounce, previewY + 5);
+
+    // Character dots
+    const dotY = canvas.height * 0.78;
+    for (let i = 0; i < CHARACTERS.length; i++) {
+        ctx.fillStyle = i === idx ? CHARACTERS[i].color : '#333';
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2 + (i - CHARACTERS.length / 2 + 0.5) * 20, dotY, 5, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Confirm hint
+    const blink = Math.sin(animCache.time * 4) > 0;
+    if (blink) {
+        ctx.fillStyle = COLORS.uiAccent;
+        ctx.font = 'bold 12px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('ENTER to confirm  •  ESC to go back', canvas.width / 2, canvas.height * 0.92);
+    }
+}
+
+// ============================================
+// DRAWING - DISTRICT SELECT
+// ============================================
+function drawDistrictSelectScreen() {
+    ctx.fillStyle = COLORS.uiBg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Title
+    ctx.fillStyle = COLORS.uiAccent;
+    ctx.font = `bold ${Math.floor(canvas.width * 0.04)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText('DISTRICT SELECT', canvas.width / 2, 35);
+
+    // City grade
+    ctx.fillStyle = '#888';
+    ctx.font = '12px monospace';
+    ctx.fillText(`City Grade: ${gameState.cityGrade}  •  ${gameState.totalStars} total stars`, canvas.width / 2, 55);
+
+    const idx = gameState._distSelectIndex || 0;
+    const listY = 75;
+    const itemH = 52;
+    const maxVisible = 10;
+
+    // Scrolling offset
+    const scrollOffset = Math.max(0, idx - 4) * itemH;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, listY, canvas.width, canvas.height - listY - 40);
+    ctx.clip();
+
+    for (let i = 0; i < DISTRICTS.length; i++) {
+        const d = DISTRICTS[i];
+        const y = listY + i * itemH - scrollOffset;
+        if (y < listY - itemH || y > canvas.height) continue;
+
+        const locked = i >= gameState.districtsUnlocked;
+        const selected = i === idx;
+        const stars = gameState.districtStars[d.id] || 0;
+        const best = gameState.districtBests[d.id];
+
+        // Background
+        if (selected) {
+            ctx.fillStyle = locked ? 'rgba(100,40,40,0.3)' : 'rgba(78,205,196,0.15)';
+            ctx.fillRect(10, y, canvas.width - 20, itemH - 4);
+        }
+
+        // District number and name
+        ctx.fillStyle = locked ? '#444' : selected ? COLORS.uiAccent : '#aaa';
+        ctx.font = `bold 14px monospace`;
+        ctx.textAlign = 'left';
+        const label = locked ? `D${d.id}: ???` : `D${d.id}: ${d.name}`;
+        ctx.fillText(label, 20, y + 18);
+
+        // Subtitle
+        ctx.fillStyle = locked ? '#333' : '#666';
+        ctx.font = '10px monospace';
+        ctx.fillText(locked ? 'Complete previous district to unlock' : d.subtitle, 20, y + 34);
+
+        // Stars
+        if (!locked) {
+            ctx.fillStyle = COLORS.uiGold;
+            ctx.font = '14px monospace';
+            ctx.textAlign = 'right';
+            const starStr = '\u2605'.repeat(stars) + '\u2606'.repeat(3 - stars);
+            ctx.fillText(starStr, canvas.width - 20, y + 18);
+
+            // Personal best
+            if (best) {
+                ctx.fillStyle = '#666';
+                ctx.font = '10px monospace';
+                ctx.fillText(`Best: ${best.pct}% | ${best.time}s left`, canvas.width - 20, y + 34);
+            }
+        } else {
+            ctx.fillStyle = '#333';
+            ctx.font = '14px monospace';
+            ctx.textAlign = 'right';
+            ctx.fillText('\uD83D\uDD12', canvas.width - 20, y + 22);
+        }
+
+        // Timer info
+        if (!locked) {
+            ctx.fillStyle = '#555';
+            ctx.font = '10px monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(`${d.timer}s`, 20, y + 46);
+        }
+    }
+
+    ctx.restore();
+
+    // Bottom hint
+    ctx.fillStyle = '#555';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('ENTER to play  •  ESC to go back', canvas.width / 2, canvas.height - 15);
 }
 
 // ============================================
@@ -2242,6 +2762,8 @@ function update(dt) {
         updatePlayer(dt);
         updatePigeons(dt);
         updateHobos(dt);
+        updateEarthquake(dt);
+        updatePigeonFrenzy(dt);
         updateCamera(dt);
         updateTimer(dt);
         updateParticles(dt);
@@ -2254,19 +2776,30 @@ function update(dt) {
         }
     } else if (gameState.screen === 'gameOver') {
         updateParticles(dt);
+        // C key to copy score
+        if (keys['KeyC'] || keyBuffer['KeyC']) {
+            copyScoreToClipboard();
+        }
         if (inputActions.confirm) {
-            // Restart same district
             startDistrict(gameState.district);
         }
     } else if (gameState.screen === 'districtComplete') {
+        // C key to copy score
+        if (keys['KeyC'] || keyBuffer['KeyC']) {
+            copyScoreToClipboard();
+        }
         if (inputActions.confirm) {
             const nextDist = gameState.district + 1;
-            if (nextDist < DISTRICTS.length) {
+            if (nextDist < DISTRICTS.length && nextDist < gameState.districtsUnlocked) {
                 startDistrict(nextDist);
             } else {
                 gameState.screen = 'title';
             }
         }
+    } else if (gameState.screen === 'charSelect') {
+        updateCharSelect(dt);
+    } else if (gameState.screen === 'districtSelect') {
+        updateDistrictSelect(dt);
     }
 }
 
@@ -2277,19 +2810,90 @@ function updateTitleMenu(dt) {
         gameState._menuIndex = Math.max(0, gameState._menuIndex - 1);
     }
     if (inputActions.down) {
-        gameState._menuIndex = Math.min(2, gameState._menuIndex + 1);
+        gameState._menuIndex = Math.min(3, gameState._menuIndex + 1);
     }
     if (inputActions.confirm) {
         if (gameState._menuIndex === 0) {
-            // Start shift
-            startDistrict(0);
+            // Start shift — go to character select first
+            gameState._pendingMode = 'start';
+            gameState.screen = 'charSelect';
+            gameState._charIndex = gameState.selectedCharacter;
         } else if (gameState._menuIndex === 1) {
-            // Quick shift - random 3 districts
-            startDistrict(Math.floor(Math.random() * DISTRICTS.length));
+            // Quick shift — character select then random district
+            gameState._pendingMode = 'quick';
+            gameState.screen = 'charSelect';
+            gameState._charIndex = gameState.selectedCharacter;
         } else if (gameState._menuIndex === 2) {
-            // District select - for now just start district 1
-            startDistrict(0);
+            // District select
+            gameState.screen = 'districtSelect';
+            gameState._distSelectIndex = 0;
+        } else if (gameState._menuIndex === 3) {
+            // Daily district
+            const dailyIdx = getDailyDistrictIndex();
+            gameState._pendingMode = 'daily';
+            gameState._pendingDistrict = dailyIdx;
+            gameState.screen = 'charSelect';
+            gameState._charIndex = gameState.selectedCharacter;
         }
+    }
+}
+
+function updateCharSelect(dt) {
+    if (gameState._charIndex === undefined) gameState._charIndex = 0;
+
+    if (inputActions.left) {
+        gameState._charIndex = (gameState._charIndex - 1 + CHARACTERS.length) % CHARACTERS.length;
+    }
+    if (inputActions.right) {
+        gameState._charIndex = (gameState._charIndex + 1) % CHARACTERS.length;
+    }
+    if (inputActions.confirm) {
+        gameState.selectedCharacter = gameState._charIndex;
+        saveProgress();
+        const mode = gameState._pendingMode || 'start';
+        if (mode === 'start') {
+            startDistrict(0);
+        } else if (mode === 'quick') {
+            const idx = Math.floor(Math.random() * Math.min(gameState.districtsUnlocked, DISTRICTS.length));
+            startDistrict(idx);
+        } else if (mode === 'daily') {
+            startDistrict(gameState._pendingDistrict || 0);
+        } else if (mode === 'select') {
+            startDistrict(gameState._pendingDistrict || 0);
+        }
+    }
+    // Back to title
+    if (inputActions.pause) {
+        gameState.screen = 'title';
+    }
+}
+
+function updateDistrictSelect(dt) {
+    if (gameState._distSelectIndex === undefined) gameState._distSelectIndex = 0;
+
+    if (inputActions.up) {
+        gameState._distSelectIndex = Math.max(0, gameState._distSelectIndex - 1);
+    }
+    if (inputActions.down) {
+        gameState._distSelectIndex = Math.min(DISTRICTS.length - 1, gameState._distSelectIndex + 1);
+    }
+    if (inputActions.left) {
+        gameState._distSelectIndex = Math.max(0, gameState._distSelectIndex - 1);
+    }
+    if (inputActions.right) {
+        gameState._distSelectIndex = Math.min(DISTRICTS.length - 1, gameState._distSelectIndex + 1);
+    }
+    if (inputActions.confirm) {
+        if (gameState._distSelectIndex < gameState.districtsUnlocked) {
+            gameState._pendingMode = 'select';
+            gameState._pendingDistrict = gameState._distSelectIndex;
+            gameState.screen = 'charSelect';
+            gameState._charIndex = gameState.selectedCharacter;
+        }
+    }
+    // Back to title
+    if (inputActions.pause) {
+        gameState.screen = 'title';
     }
 }
 
@@ -2306,8 +2910,17 @@ function draw() {
         return;
     }
 
+    if (gameState.screen === 'charSelect') {
+        drawCharSelectScreen();
+        return;
+    }
+
+    if (gameState.screen === 'districtSelect') {
+        drawDistrictSelectScreen();
+        return;
+    }
+
     if (gameState.screen === 'gameOver') {
-        // Draw the game world behind the overlay
         drawGameWorld();
         drawGameOverScreen();
         return;
@@ -2514,7 +3127,11 @@ function loadProgress() {
         if (saved) {
             const data = JSON.parse(saved);
             gameState.districtStars = data.districtStars || {};
+            gameState.districtBests = data.districtBests || {};
             gameState.totalStars = data.totalStars || 0;
+            gameState.districtsUnlocked = data.districtsUnlocked || 1;
+            gameState.headlinesSeen = data.headlinesSeen || [];
+            gameState.selectedCharacter = data.selectedCharacter || 0;
             gameState.cityGrade = calculateGrade(gameState.totalStars);
         }
     } catch (e) {
@@ -2526,7 +3143,11 @@ function saveProgress() {
     try {
         localStorage.setItem('doodyCalls_progress', JSON.stringify({
             districtStars: gameState.districtStars,
+            districtBests: gameState.districtBests,
             totalStars: gameState.totalStars,
+            districtsUnlocked: gameState.districtsUnlocked,
+            headlinesSeen: gameState.headlinesSeen,
+            selectedCharacter: gameState.selectedCharacter,
         }));
     } catch (e) {
         debugLog('Failed to save progress:', e);
