@@ -407,10 +407,10 @@ function updateInputActions() {
         });
     };
 
-    inputActions.up = shouldMove(['ArrowUp', 'KeyW']);
-    inputActions.down = shouldMove(['ArrowDown', 'KeyS']);
-    inputActions.left = shouldMove(['ArrowLeft', 'KeyA']);
-    inputActions.right = shouldMove(['ArrowRight', 'KeyD']);
+    inputActions.up = shouldMove(['ArrowUp', 'KeyW', 'SwipeUp']);
+    inputActions.down = shouldMove(['ArrowDown', 'KeyS', 'SwipeDown']);
+    inputActions.left = shouldMove(['ArrowLeft', 'KeyA', 'SwipeLeft']);
+    inputActions.right = shouldMove(['ArrowRight', 'KeyD', 'SwipeRight']);
 
     // One-shot actions use buffered keys (survive fast tap/release)
     const actionPressed = keys['Space'] || keys['KeyZ'] || keys['Enter'] ||
@@ -2367,6 +2367,81 @@ function initGame() {
         keyPressTime[e.code] = 0;
         keyMoved[e.code] = false;
     });
+
+    // Touch/swipe controls for mobile
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchStartTime = 0;
+    let touchActive = false;
+    const SWIPE_THRESHOLD = 20;  // min pixels for swipe
+    const TAP_THRESHOLD = 15;    // max pixels for tap
+
+    function clearTouchKeys() {
+        keys['SwipeUp'] = false;
+        keys['SwipeDown'] = false;
+        keys['SwipeLeft'] = false;
+        keys['SwipeRight'] = false;
+    }
+
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+        touchStartTime = Date.now();
+        touchActive = true;
+        clearTouchKeys();
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (!touchActive) return;
+        const touch = e.touches[0];
+        const dx = touch.clientX - touchStartX;
+        const dy = touch.clientY - touchStartY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist >= SWIPE_THRESHOLD) {
+            clearTouchKeys();
+            if (Math.abs(dx) > Math.abs(dy)) {
+                const dir = dx > 0 ? 'SwipeRight' : 'SwipeLeft';
+                keys[dir] = true;
+                keyBuffer[dir] = true;
+                keyPressTime[dir] = Date.now();
+                keyMoved[dir] = false;
+            } else {
+                const dir = dy > 0 ? 'SwipeDown' : 'SwipeUp';
+                keys[dir] = true;
+                keyBuffer[dir] = true;
+                keyPressTime[dir] = Date.now();
+                keyMoved[dir] = false;
+            }
+            // Reset start point for continuous swipe movement
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+        }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        if (!touchActive) return;
+        touchActive = false;
+
+        const elapsed = Date.now() - touchStartTime;
+        const touch = e.changedTouches[0];
+        const dx = touch.clientX - touchStartX;
+        const dy = touch.clientY - touchStartY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        // Tap = confirm/action
+        if (dist < TAP_THRESHOLD && elapsed < 300) {
+            keyBuffer['Space'] = true;
+            keys['Space'] = true;
+            setTimeout(() => { keys['Space'] = false; }, 50);
+        }
+
+        clearTouchKeys();
+    }, { passive: false });
 
     // Load saved progress
     loadProgress();
