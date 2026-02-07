@@ -2209,83 +2209,125 @@ function drawNewsTicker() {
 function drawTitleScreen() {
     const cw = canvas.width;
     const ch = canvas.height;
+    const t = animCache.time;
 
-    // Background
-    ctx.fillStyle = COLORS.uiBg;
+    // ── Layer 1: Sky gradient (pre-dawn atmosphere) ──
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, ch);
+    skyGrad.addColorStop(0.00, '#0a0a1e');   // deep space
+    skyGrad.addColorStop(0.15, '#141432');    // dark indigo
+    skyGrad.addColorStop(0.35, '#1e1440');    // purple
+    skyGrad.addColorStop(0.55, '#3d1a4a');    // warm purple
+    skyGrad.addColorStop(0.70, '#6b2040');    // magenta-red
+    skyGrad.addColorStop(0.82, '#c84820');    // deep orange
+    skyGrad.addColorStop(0.92, '#e87830');    // bright orange
+    skyGrad.addColorStop(1.00, '#f0a040');    // golden horizon
+    ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, cw, ch);
 
-    // Menu layout constants
-    const menuY = ch * 0.48;
-    const menuSpacing = 42;
-    const bufferY = 20;
-    const backdropTop = menuY - bufferY;
-    const backdropBottom = menuY + 3 * menuSpacing + 22 + bufferY;
-    const backdropH = backdropBottom - backdropTop;
-    const backdropW = cw * 0.65;
-    const backdropX = (cw - backdropW) / 2;
-
-    // Sunrise gradient — warm glow behind the skyline
-    const sunCenterX = cw * 0.5;
-    const sunCenterY = backdropBottom;
-    const sunRadius = cw * 0.7;
-    const sunGrad = ctx.createRadialGradient(sunCenterX, sunCenterY, 0, sunCenterX, sunCenterY, sunRadius);
-    sunGrad.addColorStop(0, 'rgba(255,140,50,0.25)');
-    sunGrad.addColorStop(0.3, 'rgba(255,80,40,0.12)');
-    sunGrad.addColorStop(0.6, 'rgba(180,40,80,0.06)');
-    sunGrad.addColorStop(1, 'rgba(10,10,26,0)');
+    // ── Layer 2: Sun radial glow ──
+    const horizonY = ch * 0.78;
+    const sunGrad = ctx.createRadialGradient(cw * 0.5, horizonY, 0, cw * 0.5, horizonY, cw * 0.55);
+    sunGrad.addColorStop(0.0, 'rgba(255,200,80,0.45)');
+    sunGrad.addColorStop(0.2, 'rgba(255,140,50,0.30)');
+    sunGrad.addColorStop(0.5, 'rgba(200,60,40,0.15)');
+    sunGrad.addColorStop(1.0, 'rgba(60,20,40,0.0)');
     ctx.fillStyle = sunGrad;
     ctx.fillRect(0, 0, cw, ch);
 
-    // City skyline — buildings bottom aligned with backdrop bottom
-    drawCitySkyline(backdropBottom);
+    // ── Layer 3: Horizontal glow band ──
+    const bandGrad = ctx.createLinearGradient(0, ch * 0.72, 0, ch * 0.88);
+    bandGrad.addColorStop(0.0, 'rgba(255,160,60,0.0)');
+    bandGrad.addColorStop(0.4, 'rgba(255,160,60,0.20)');
+    bandGrad.addColorStop(0.6, 'rgba(255,200,100,0.25)');
+    bandGrad.addColorStop(1.0, 'rgba(255,160,60,0.0)');
+    ctx.fillStyle = bandGrad;
+    ctx.fillRect(0, 0, cw, ch);
 
-    // Wordmark logo
+    // ── Layer 4: Stars ──
+    for (let i = 0; i < 30; i++) {
+        const sx = ((i * 137 + 47) % 600) + 20;
+        const sy = ((i * 251 + 89) % (ch * 0.35));
+        const size = (i % 3 === 0) ? 2 : 1;
+        // ~5 stars twinkle
+        let alpha = 0.3 + (i * 73 % 50) / 100;
+        if (i % 6 === 0) {
+            alpha *= 0.5 + 0.5 * Math.sin(t * (0.8 + (i % 5) * 0.3) + i);
+        }
+        ctx.globalAlpha = Math.max(0, alpha);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(sx, sy, size, size);
+    }
+    ctx.globalAlpha = 1;
+
+    // ── Layer 5–6: City skyline (both rows, anchored to canvas bottom) ──
+    drawCitySkyline();
+
+    // ── Layer 7: Menu band (full-width gradient fade) ──
+    const bandTop = 216;
+    const bandSolid = 248;
+    const bandSolidEnd = 408;
+    const bandBottom = 440;
+
+    // Top fade in
+    const fadeInGrad = ctx.createLinearGradient(0, bandTop, 0, bandSolid);
+    fadeInGrad.addColorStop(0, 'rgba(10,10,30,0.0)');
+    fadeInGrad.addColorStop(1, 'rgba(10,10,30,0.85)');
+    ctx.fillStyle = fadeInGrad;
+    ctx.fillRect(0, bandTop, cw, bandSolid - bandTop);
+
+    // Solid middle
+    ctx.fillStyle = 'rgba(10,10,30,0.85)';
+    ctx.fillRect(0, bandSolid, cw, bandSolidEnd - bandSolid);
+
+    // Bottom fade out
+    const fadeOutGrad = ctx.createLinearGradient(0, bandSolidEnd, 0, bandBottom);
+    fadeOutGrad.addColorStop(0, 'rgba(10,10,30,0.85)');
+    fadeOutGrad.addColorStop(1, 'rgba(10,10,30,0.0)');
+    ctx.fillStyle = fadeOutGrad;
+    ctx.fillRect(0, bandSolidEnd, cw, bandBottom - bandSolidEnd);
+
+    // Thin accent line at top of solid band
+    ctx.fillStyle = 'rgba(78,205,196,0.3)';
+    ctx.fillRect(cw * 0.15, bandSolid, cw * 0.70, 1);
+
+    // ── Layer 8: Wordmark logo ──
     if (wordmarkImg.complete && wordmarkImg.naturalWidth > 0) {
-        const logoW = cw * 0.55;
+        const logoW = cw * 0.52;
         const logoH = logoW * (wordmarkImg.naturalHeight / wordmarkImg.naturalWidth);
         const logoX = (cw - logoW) / 2;
-        const logoY = ch * 0.04;
+        const logoY = ch * 0.025;
         ctx.drawImage(wordmarkImg, logoX, logoY, logoW, logoH);
 
-        // Subtitle below logo
-        ctx.fillStyle = COLORS.uiAccent;
-        ctx.font = `${Math.floor(cw * 0.028)}px monospace`;
+        // Subtitle
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle = '#4ecdc4';
+        ctx.font = `${Math.floor(cw * 0.022)}px monospace`;
         ctx.textAlign = 'center';
-        ctx.fillText('San Francisco needs you before they wake up.', cw / 2, logoY + logoH + 8);
+        ctx.fillText('San Francisco needs you before they wake up.', cw / 2, logoY + logoH - 8);
+        ctx.globalAlpha = 1;
     } else {
-        // Fallback text while loading
-        const titleY = ch * 0.22;
+        // Fallback text
+        const titleY = ch * 0.20;
         ctx.fillStyle = '#ff8040';
         ctx.font = `bold ${Math.floor(cw * 0.09)}px monospace`;
         ctx.textAlign = 'center';
         ctx.fillText('DOODY CALLS', cw / 2, titleY);
 
-        ctx.fillStyle = COLORS.uiAccent;
-        ctx.font = `${Math.floor(cw * 0.028)}px monospace`;
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle = '#4ecdc4';
+        ctx.font = `${Math.floor(cw * 0.022)}px monospace`;
         ctx.fillText('San Francisco needs you before they wake up.', cw / 2, titleY + 35);
+        ctx.globalAlpha = 1;
     }
-    ctx.fillStyle = 'rgba(10,10,26,0.65)';
-    // Rounded rect
-    const r = 8;
-    ctx.beginPath();
-    ctx.moveTo(backdropX + r, backdropTop);
-    ctx.lineTo(backdropX + backdropW - r, backdropTop);
-    ctx.quadraticCurveTo(backdropX + backdropW, backdropTop, backdropX + backdropW, backdropTop + r);
-    ctx.lineTo(backdropX + backdropW, backdropTop + backdropH - r);
-    ctx.quadraticCurveTo(backdropX + backdropW, backdropTop + backdropH, backdropX + backdropW - r, backdropTop + backdropH);
-    ctx.lineTo(backdropX + r, backdropTop + backdropH);
-    ctx.quadraticCurveTo(backdropX, backdropTop + backdropH, backdropX, backdropTop + backdropH - r);
-    ctx.lineTo(backdropX, backdropTop + r);
-    ctx.quadraticCurveTo(backdropX, backdropTop, backdropX + r, backdropTop);
-    ctx.closePath();
-    ctx.fill();
 
-    // Menu options
+    // ── Layer 9: Menu items ──
+    const menuY = ch * 0.4375;
+    const menuSpacing = 40;
     const dailyDist = DISTRICTS[getDailyDistrictIndex()];
     const menuItems = [
         { label: 'START SHIFT', desc: 'Begin District 1' },
         { label: 'QUICK SHIFT', desc: 'Random district' },
-        { label: 'DISTRICT SELECT', desc: `${gameState.districtsUnlocked}/${DISTRICTS.length} unlocked • Grade: ${gameState.cityGrade}` },
+        { label: 'DISTRICT SELECT', desc: `${gameState.districtsUnlocked}/${DISTRICTS.length} unlocked | Grade: ${gameState.cityGrade}` },
         { label: 'DAILY CHALLENGE', desc: `Today: ${dailyDist.name}` },
     ];
 
@@ -2294,80 +2336,104 @@ function drawTitleScreen() {
     for (let i = 0; i < menuItems.length; i++) {
         const y = menuY + i * menuSpacing;
         const selected = i === selectedIndex;
-        const pulse = selected ? Math.sin(animCache.time * 4) * 0.15 + 0.85 : 0.5;
 
-        ctx.globalAlpha = pulse;
-        ctx.fillStyle = selected ? COLORS.uiAccent : '#888';
-        ctx.font = `bold ${Math.floor(cw * 0.035)}px monospace`;
+        if (selected) {
+            ctx.fillStyle = '#4ecdc4';
+            ctx.font = `bold ${Math.floor(cw * 0.038)}px monospace`;
+            ctx.globalAlpha = 1.0;
+            ctx.shadowColor = 'rgba(78,205,196,0.5)';
+            ctx.shadowBlur = 12;
+        } else {
+            ctx.fillStyle = '#7888a0';
+            ctx.font = `bold ${Math.floor(cw * 0.032)}px monospace`;
+            ctx.globalAlpha = 0.6;
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+        }
+
         ctx.textAlign = 'center';
         ctx.fillText(menuItems[i].label, cw / 2, y);
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
 
-        ctx.fillStyle = selected ? '#aaa' : '#555';
-        ctx.font = `${Math.floor(cw * 0.02)}px monospace`;
-        ctx.fillText(menuItems[i].desc, cw / 2, y + 18);
+        // Description
+        if (selected) {
+            ctx.fillStyle = '#a0b0c0';
+            ctx.font = `${Math.floor(cw * 0.019)}px monospace`;
+            ctx.globalAlpha = 0.7;
+        } else {
+            ctx.fillStyle = '#506070';
+            ctx.font = `${Math.floor(cw * 0.017)}px monospace`;
+            ctx.globalAlpha = 0.4;
+        }
+        ctx.fillText(menuItems[i].desc, cw / 2, y + 16);
     }
     ctx.globalAlpha = 1;
 
-    // Selection arrow
-    const arrowY = menuY + selectedIndex * menuSpacing - 5;
-    const arrowBounce = Math.sin(animCache.time * 6) * 4;
-    ctx.fillStyle = COLORS.uiAccent;
-    ctx.font = `${Math.floor(cw * 0.035)}px monospace`;
+    // ── Layer 10: Selection arrow ──
+    const arrowY = menuY + selectedIndex * menuSpacing;
+    const arrowBounce = Math.sin(t * 5) * 3;
+    ctx.fillStyle = '#4ecdc4';
+    ctx.font = `bold ${Math.floor(cw * 0.038)}px monospace`;
     ctx.textAlign = 'right';
-    ctx.fillText('>', cw / 2 - 120 + arrowBounce, arrowY);
+    ctx.shadowColor = 'rgba(78,205,196,0.4)';
+    ctx.shadowBlur = 8;
+    ctx.fillText('>', cw / 2 - 105 + arrowBounce, arrowY);
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
 
-    // Controls hint
-    ctx.fillStyle = '#555';
-    ctx.font = '10px monospace';
+    // ── Layer 11: Footer ──
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = '#506070';
+    ctx.font = `${Math.floor(cw * 0.017)}px monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText('Arrow Keys / WASD to move  •  Space to clean  •  Enter to select',
-                 cw / 2, ch - 40);
+    ctx.fillText('Arrow Keys / WASD to move  |  Space to clean  |  Enter to select',
+                 cw / 2, ch - 36);
 
-    // Credits
-    ctx.fillStyle = '#333';
-    ctx.font = '9px monospace';
-    ctx.fillText('A Kingmade LLC Production  •  Built by Marty\'s Belgian Dev Team',
-                 cw / 2, ch - 20);
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = '#384050';
+    ctx.font = `${Math.floor(cw * 0.015)}px monospace`;
+    ctx.fillText('A Kingmade LLC Production  |  Built by Marty\'s Belgian Dev Team',
+                 cw / 2, ch - 18);
+    ctx.globalAlpha = 1;
 }
 
-function drawCitySkyline(bottomY) {
+function drawCitySkyline() {
     const t = animCache.time;
     const cw = canvas.width;
     const ch = canvas.height;
-    const baseY = bottomY || ch; // where building bottoms sit
 
-    // Back row (distant, dimmer) - heights relative to baseY
+    // Back row (distant, dimmer) — heights 0.30–0.50 of canvas, anchored to bottom
     const backBuildings = [
-        { x: 0.00, w: 0.05, h: 0.55 },
-        { x: 0.06, w: 0.10, h: 0.75 },
-        { x: 0.17, w: 0.04, h: 0.60 },
-        { x: 0.22, w: 0.08, h: 0.82 },
-        { x: 0.31, w: 0.05, h: 0.65 },
-        { x: 0.37, w: 0.12, h: 0.88 },  // Wide tower - center
-        { x: 0.50, w: 0.04, h: 0.68 },
-        { x: 0.55, w: 0.09, h: 0.80 },
-        { x: 0.65, w: 0.06, h: 0.58 },
-        { x: 0.72, w: 0.11, h: 0.78 },
-        { x: 0.84, w: 0.04, h: 0.62 },
-        { x: 0.89, w: 0.07, h: 0.70 },
-        { x: 0.97, w: 0.04, h: 0.55 },
+        { x: 0.00, w: 0.06, h: 0.30 },
+        { x: 0.07, w: 0.08, h: 0.42 },
+        { x: 0.16, w: 0.05, h: 0.33 },
+        { x: 0.22, w: 0.07, h: 0.45, style: 'setback' },
+        { x: 0.30, w: 0.06, h: 0.50, style: 'pyramid' },    // Transamerica
+        { x: 0.37, w: 0.09, h: 0.38 },
+        { x: 0.47, w: 0.05, h: 0.35, style: 'antenna' },
+        { x: 0.53, w: 0.04, h: 0.48 },                       // Tall narrow tower
+        { x: 0.58, w: 0.08, h: 0.40 },
+        { x: 0.67, w: 0.06, h: 0.32 },
+        { x: 0.74, w: 0.10, h: 0.44, style: 'setback' },
+        { x: 0.85, w: 0.05, h: 0.36 },
+        { x: 0.91, w: 0.09, h: 0.30 },
     ];
 
-    // Front row (closer, brighter, shorter) - mixed silhouettes
+    // Front row (closer, brighter, shorter) — heights 0.20–0.38
     const frontBuildings = [
-        { x: 0.00, w: 0.10, h: 0.38 },
-        { x: 0.11, w: 0.04, h: 0.55 },
-        { x: 0.16, w: 0.07, h: 0.42 },
-        { x: 0.24, w: 0.11, h: 0.58 },
-        { x: 0.36, w: 0.05, h: 0.45 },
-        { x: 0.42, w: 0.09, h: 0.62 },
-        { x: 0.52, w: 0.04, h: 0.50 },
-        { x: 0.57, w: 0.08, h: 0.40 },
-        { x: 0.66, w: 0.05, h: 0.56 },
-        { x: 0.72, w: 0.10, h: 0.44 },
-        { x: 0.83, w: 0.04, h: 0.52 },
-        { x: 0.88, w: 0.08, h: 0.38 },
-        { x: 0.97, w: 0.04, h: 0.48 },
+        { x: 0.00, w: 0.09, h: 0.22 },
+        { x: 0.10, w: 0.06, h: 0.32 },
+        { x: 0.17, w: 0.08, h: 0.25 },
+        { x: 0.26, w: 0.07, h: 0.36 },
+        { x: 0.34, w: 0.10, h: 0.28 },
+        { x: 0.45, w: 0.06, h: 0.38 },
+        { x: 0.52, w: 0.09, h: 0.24 },
+        { x: 0.62, w: 0.05, h: 0.34 },
+        { x: 0.68, w: 0.08, h: 0.26 },
+        { x: 0.77, w: 0.10, h: 0.30 },
+        { x: 0.88, w: 0.06, h: 0.20 },
+        { x: 0.95, w: 0.06, h: 0.28 },
     ];
 
     function drawBuildingRow(buildings, bodyColor, winGapX, winGapY, winW, winH) {
@@ -2375,46 +2441,70 @@ function drawCitySkyline(bottomY) {
             const bx = b.x * cw;
             const bw = b.w * cw;
             const bh = b.h * ch;
-            const topY = baseY - bh;
+            let topY = ch - bh;
 
-            // Building body
             ctx.fillStyle = bodyColor;
-            ctx.fillRect(bx, topY, bw, bh);
+
+            // Special building styles
+            if (b.style === 'pyramid') {
+                // Triangular spire on top
+                ctx.beginPath();
+                ctx.moveTo(bx, topY);
+                ctx.lineTo(bx + bw / 2, topY - bw * 0.7);
+                ctx.lineTo(bx + bw, topY);
+                ctx.closePath();
+                ctx.fill();
+                ctx.fillRect(bx, topY, bw, bh);
+            } else if (b.style === 'antenna') {
+                // Thin antenna extending up
+                ctx.fillRect(bx + bw / 2 - 1, topY - 18, 2, 18);
+                ctx.fillRect(bx, topY, bw, bh);
+            } else if (b.style === 'setback') {
+                // Narrower top section
+                const inset = bw * 0.2;
+                const setbackH = bh * 0.3;
+                ctx.fillRect(bx + inset, topY, bw - inset * 2, setbackH);
+                ctx.fillRect(bx, topY + setbackH, bw, bh - setbackH);
+            } else {
+                ctx.fillRect(bx, topY, bw, bh);
+            }
 
             // Windows with blinking lights
-            for (let wy = topY + 4; wy < baseY - 3; wy += winGapY) {
+            for (let wy = topY + 4; wy < ch - 3; wy += winGapY) {
                 for (let wx = bx + 3; wx < bx + bw - 3; wx += winGapX) {
                     const seed = (Math.floor(wx) * 137 + Math.floor(wy) * 251) % 1000;
                     const blinkRate = 0.08 + (seed % 60) / 60 * 0.35;
                     const blinkPhase = seed / 1000 * Math.PI * 2;
                     const blinkVal = Math.sin(t * blinkRate * Math.PI * 2 + blinkPhase);
 
-                    const isBlinking = seed % 6 === 0;  // ~17% blink
+                    const isBlinking = seed % 6 === 0;
                     const isLit = isBlinking ? blinkVal > 0 : seed % 3 !== 0;
 
                     if (isLit) {
                         const tone = seed % 7;
-                        ctx.fillStyle = tone === 0 ? '#f0d06080' :  // warm gold
-                                        tone === 1 ? '#e8c04070' :  // amber
-                                        tone === 2 ? '#d0a03060' :  // deep amber
-                                        tone === 3 ? '#c0d8f050' :  // cool blue-white
-                                        tone === 4 ? '#f0e8c878' :  // bright warm
-                                        tone === 5 ? '#90b0d048' :  // steel blue
-                                                     '#e0c87060' ;  // muted gold
+                        ctx.fillStyle = tone === 0 ? '#f0d06080' :
+                                        tone === 1 ? '#e8c04070' :
+                                        tone === 2 ? '#d0a03060' :
+                                        tone === 3 ? '#c0d8f050' :
+                                        tone === 4 ? '#f0e8c878' :
+                                        tone === 5 ? '#90b0d048' :
+                                                     '#e0c87060' ;
                     } else {
                         ctx.fillStyle = '#1a1a3a';
                     }
                     ctx.fillRect(wx, wy, winW, winH);
                 }
             }
+            // Reset fill for next building body
+            ctx.fillStyle = bodyColor;
         }
     }
 
     // Draw back row (dimmer, smaller windows)
-    drawBuildingRow(backBuildings, '#0d0d1e', 6, 7, 2, 3);
+    drawBuildingRow(backBuildings, '#0d0d20', 6, 7, 2, 2);
 
     // Draw front row (brighter, larger windows)
-    drawBuildingRow(frontBuildings, '#10102a', 7, 8, 3, 4);
+    drawBuildingRow(frontBuildings, '#12122e', 7, 8, 3, 3);
 }
 
 // ============================================
