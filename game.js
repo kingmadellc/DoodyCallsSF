@@ -2785,12 +2785,12 @@ function drawHUD() {
     ctx.fill();
     // Draw pause icon (two vertical bars)
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    const barW = 4, barH = 14;
-    const barGap = 5;
-    const barsX = pbX + (pbSize - barW * 2 - barGap) / 2;
-    const barsY = pbY + (pbSize - barH) / 2;
-    ctx.fillRect(barsX, barsY, barW, barH);
-    ctx.fillRect(barsX + barW + barGap, barsY, barW, barH);
+    const pBarW = 4, pBarH = 14;
+    const pBarGap = 5;
+    const pBarsX = pbX + (pbSize - pBarW * 2 - pBarGap) / 2;
+    const pBarsY = pbY + (pbSize - pBarH) / 2;
+    ctx.fillRect(pBarsX, pBarsY, pBarW, pBarH);
+    ctx.fillRect(pBarsX + pBarW + pBarGap, pBarsY, pBarW, pBarH);
 
     // === Finish Shift button when >= 60% clean ===
     mobileFinishBtnRect = null;
