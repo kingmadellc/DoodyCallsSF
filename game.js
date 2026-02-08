@@ -425,31 +425,6 @@ const CHARACTERS = [
         abilityDesc: '+20% move speed',
     },
     {
-        id: 'marty', name: 'Marty', desc: 'Coffee-powered, scared of alleys',
-        color: '#d06030', visorColor: '#ff8040', ability: 'clean',
-        abilityDesc: 'Auto-clean is faster (skip DIRTY state)',
-    },
-    {
-        id: 'saas-exec', name: 'The SaaS Exec', desc: 'Reconciles messes like line items',
-        color: '#2080b0', visorColor: '#40c0ff', ability: 'efficiency',
-        abilityDesc: 'Cleaning earns +15% score bonus',
-    },
-    {
-        id: 'professor', name: 'The Professor', desc: 'Lectures pigeons on hygiene',
-        color: '#705030', visorColor: '#c0a070', ability: 'reveal',
-        abilityDesc: 'All messes visible on minimap',
-    },
-    {
-        id: 'eyeglass', name: 'The Eyeglass Aficionado', desc: 'Spots every speck through premium lenses',
-        color: '#a04080', visorColor: '#ff60c0', ability: 'vision',
-        abilityDesc: 'Wider visibility radius',
-    },
-    {
-        id: 'exec-producer', name: 'The Exec Producer', desc: 'Moshing by night, mopping by dawn',
-        color: '#c0a020', visorColor: '#ffe060', ability: 'speed',
-        abilityDesc: '+20% move speed',
-    },
-    {
         id: 'idaho-bro-1', name: 'Idahoan Brother #1', desc: 'Bald, bearded, probably reading',
         color: '#608040', visorColor: '#a0d060', ability: 'armor',
         abilityDesc: 'Immune to first earthquake',
@@ -460,14 +435,9 @@ const CHARACTERS = [
         abilityDesc: '+30s time on first district',
     },
     {
-        id: 'wealth-mgr', name: 'The Wealth Manager', desc: 'Diversifies his cleaning portfolio',
-        color: '#3050a0', visorColor: '#6090e0', ability: 'bonus',
-        abilityDesc: '+10% bonus time each district',
-    },
-    {
-        id: 'partner', name: 'The Partner', desc: 'Closing deals and closing dumpster lids',
-        color: '#404040', visorColor: '#a0a0a0', ability: 'armor',
-        abilityDesc: 'Immune to first earthquake',
+        id: 'marty', name: 'Marty', desc: 'Coffee-powered, scared of alleys',
+        color: '#d06030', visorColor: '#ff8040', ability: 'clean',
+        abilityDesc: 'Auto-clean is faster (skip DIRTY state)',
     },
     {
         id: 'designer', name: 'The Designer', desc: 'Won\'t clean until the grid is aligned',
@@ -475,14 +445,44 @@ const CHARACTERS = [
         abilityDesc: 'Auto-clean is faster (skip DIRTY state)',
     },
     {
-        id: 'vp-bizdev', name: 'The VP of Biz Dev', desc: 'Oddly skilled with hammers',
-        color: '#306080', visorColor: '#50a0c0', ability: 'speed',
+        id: 'exec-producer', name: 'The Exec Producer', desc: 'Moshing by night, mopping by dawn',
+        color: '#c0a020', visorColor: '#ffe060', ability: 'speed',
         abilityDesc: '+20% move speed',
+    },
+    {
+        id: 'eyeglass', name: 'The Eyeglass Aficionado', desc: 'Spots every speck through premium lenses',
+        color: '#a04080', visorColor: '#ff60c0', ability: 'vision',
+        abilityDesc: 'Wider visibility radius',
     },
     {
         id: 'hr-lead', name: 'The HR Lead', desc: 'Will clean your street then poach your talent',
         color: '#806040', visorColor: '#c0a080', ability: 'scout',
         abilityDesc: '+30s time on first district',
+    },
+    {
+        id: 'partner', name: 'The Partner', desc: 'Closing deals and closing dumpster lids',
+        color: '#404040', visorColor: '#a0a0a0', ability: 'armor',
+        abilityDesc: 'Immune to first earthquake',
+    },
+    {
+        id: 'professor', name: 'The Professor', desc: 'Lectures pigeons on hygiene',
+        color: '#705030', visorColor: '#c0a070', ability: 'reveal',
+        abilityDesc: 'All messes visible on minimap',
+    },
+    {
+        id: 'saas-exec', name: 'The SaaS Exec', desc: 'Reconciles messes like line items',
+        color: '#2080b0', visorColor: '#40c0ff', ability: 'efficiency',
+        abilityDesc: 'Cleaning earns +15% score bonus',
+    },
+    {
+        id: 'vp-bizdev', name: 'The VP of Biz Dev', desc: 'Oddly skilled with hammers',
+        color: '#306080', visorColor: '#50a0c0', ability: 'speed',
+        abilityDesc: '+20% move speed',
+    },
+    {
+        id: 'wealth-mgr', name: 'The Wealth Manager', desc: 'Diversifies his cleaning portfolio',
+        color: '#3050a0', visorColor: '#6090e0', ability: 'bonus',
+        abilityDesc: '+10% bonus time each district',
     },
 ];
 
