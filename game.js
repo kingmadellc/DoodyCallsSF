@@ -273,32 +273,32 @@ const COLORS = {
 const DISTRICTS = [
     {
         id: 1, name: "Fisherman's Wharf", subtitle: "Tourist Trap",
-        timer: 120, messCount: 20, pigeonCount: 2, hoboCount: 0,
+        timer: 60, messCount: 20, pigeonCount: 2, hoboCount: 0,
         palette: { accent: '#4090c0', sky: '#2a4a6a' }
     },
     {
         id: 2, name: "Union Square", subtitle: "Luxury Litter",
-        timer: 120, messCount: 25, pigeonCount: 2, hoboCount: 1,
+        timer: 60, messCount: 25, pigeonCount: 2, hoboCount: 1,
         palette: { accent: '#c0a040', sky: '#3a2a4a' }
     },
     {
         id: 3, name: "SoMa", subtitle: "The Morning Commute",
-        timer: 120, messCount: 30, pigeonCount: 3, hoboCount: 2,
+        timer: 60, messCount: 30, pigeonCount: 3, hoboCount: 2,
         palette: { accent: '#a060c0', sky: '#2a1a3e' }
     },
     {
         id: 4, name: "Russian Hill", subtitle: "The Scenic Route",
-        timer: 90, messCount: 30, pigeonCount: 3, hoboCount: 1,
+        timer: 60, messCount: 30, pigeonCount: 3, hoboCount: 1,
         palette: { accent: '#40a060', sky: '#2a3a2a' }
     },
     {
         id: 5, name: "Haight-Ashbury", subtitle: "Vintage Refuse",
-        timer: 90, messCount: 35, pigeonCount: 3, hoboCount: 2,
+        timer: 60, messCount: 35, pigeonCount: 3, hoboCount: 2,
         palette: { accent: '#e04080', sky: '#3a2a3a' }
     },
     {
         id: 6, name: "Mission District", subtitle: "Burrito Boulevard",
-        timer: 90, messCount: 35, pigeonCount: 4, hoboCount: 2,
+        timer: 60, messCount: 35, pigeonCount: 4, hoboCount: 2,
         palette: { accent: '#e08040', sky: '#3a2a1a' }
     },
     {
@@ -318,7 +318,7 @@ const DISTRICTS = [
     },
     {
         id: 10, name: "City Hall", subtitle: "The Final Shift",
-        timer: 45, messCount: 50, pigeonCount: 6, hoboCount: 5,
+        timer: 60, messCount: 50, pigeonCount: 6, hoboCount: 5,
         palette: { accent: '#c0c0d0', sky: '#1a1a2a' }
     },
 ];
@@ -492,7 +492,7 @@ let gameState = {
     // Core
     screen: 'title',  // title, playing, paused, gameOver, districtComplete, allComplete, charSelect, districtSelect
     district: 0,       // Index into DISTRICTS array
-    timer: 120,
+    timer: 60,
     started: false,
     animationTime: 0,
 
