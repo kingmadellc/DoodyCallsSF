@@ -480,7 +480,7 @@ const CHARACTERS = [
         abilityDesc: '+20% move speed',
     },
     {
-        id: 'hr-lead', name: 'The HR Lead', desc: 'Files incident reports on every mess',
+        id: 'hr-lead', name: 'The HR Lead', desc: 'Will clean your street then poach your talent',
         color: '#806040', visorColor: '#c0a080', ability: 'scout',
         abilityDesc: '+30s time on first district',
     },
