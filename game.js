@@ -152,22 +152,22 @@ function isCleanableTile(tile) {
 // COLORS
 // ============================================
 const COLORS = {
-    // Sidewalk
-    sidewalkLight: '#b8b0a0',
-    sidewalkDark: '#a8a090',
-    sidewalkLine: '#c8c0b0',
+    // Sidewalk (warm dawn tint)
+    sidewalkLight: '#c0b098',
+    sidewalkDark: '#b0a088',
+    sidewalkLine: '#d0c0a8',
 
-    // Road
-    roadDark: '#3a3a3e',
-    roadLight: '#444448',
+    // Road (warm asphalt in early light)
+    roadDark: '#3e3838',
+    roadLight: '#484240',
     roadLine: '#e8d44d',
     crosswalk: '#e8e0d0',
 
-    // Building
-    buildingWall: '#6b5b73',
-    buildingWallAlt: '#5b4b63',
-    buildingWindow: '#2a3a5a',
-    buildingWindowLit: '#f0d060',
+    // Building (warm window light, people waking up)
+    buildingWall: '#6b5b6a',
+    buildingWallAlt: '#5b4b5a',
+    buildingWindow: '#2a3050',
+    buildingWindowLit: '#f0c848',
     buildingDoor: '#8b6b4b',
 
     // Hotel (The W)
@@ -183,9 +183,9 @@ const COLORS = {
     coffeeWall: '#6b4a2a',
     coffeeAwning: '#d4a050',
 
-    // Alley
-    alleyDark: '#4a4440',
-    alleyLight: '#5a5450',
+    // Alley (slightly warmer for dawn light seeping in)
+    alleyDark: '#504840',
+    alleyLight: '#605848',
 
     // Park
     grassLight: '#5a8a3a',
@@ -196,10 +196,10 @@ const COLORS = {
     // Curb
     curbColor: '#9a9080',
 
-    // Water
-    waterDeep: '#1a3a6a',
-    waterLight: '#2a5a8a',
-    waterFoam: '#8ab0d0',
+    // Water (dawn reflections — warmer blues with orange tint)
+    waterDeep: '#1a3858',
+    waterLight: '#2a5878',
+    waterFoam: '#a0c0d0',
 
     // Pier
     pierWood: '#8a6a3a',
@@ -234,12 +234,12 @@ const COLORS = {
     civicStone: '#c0b8b0',
     civicColumn: '#d0c8c0',
 
-    // Mess colors
-    litterColor: '#d0c0a0',
-    puddleColor: '#7a6a4a',
-    graffitiColors: ['#e04040', '#40a0e0', '#e0e040', '#a040e0'],
-    foodColor: '#c08040',
-    mysteryColor: '#6a5a2a',
+    // Mess colors (brightened for sunrise visibility)
+    litterColor: '#e8d8b0',
+    puddleColor: '#8a7a50',
+    graffitiColors: ['#f05050', '#50b0f0', '#f0f050', '#c050f0'],
+    foodColor: '#e09848',
+    mysteryColor: '#8a7a38',
 
     // UI
     uiBg: '#1a1a2e',
@@ -274,52 +274,52 @@ const DISTRICTS = [
     {
         id: 1, name: "Fisherman's Wharf", subtitle: "Tourist Trap",
         timer: 60, messCount: 20, pigeonCount: 2, hoboCount: 0,
-        palette: { accent: '#4090c0', sky: '#2a4a6a' }
+        palette: { accent: '#4090c0', sky: '#2a3050', skyHorizon: '#d47040' }
     },
     {
         id: 2, name: "Union Square", subtitle: "Luxury Litter",
         timer: 60, messCount: 25, pigeonCount: 2, hoboCount: 1,
-        palette: { accent: '#c0a040', sky: '#3a2a4a' }
+        palette: { accent: '#c0a040', sky: '#302848', skyHorizon: '#c06838' }
     },
     {
         id: 3, name: "SoMa", subtitle: "The Morning Commute",
         timer: 60, messCount: 30, pigeonCount: 3, hoboCount: 2,
-        palette: { accent: '#a060c0', sky: '#2a1a3e' }
+        palette: { accent: '#a060c0', sky: '#282040', skyHorizon: '#b86048' }
     },
     {
         id: 4, name: "Russian Hill", subtitle: "The Scenic Route",
         timer: 60, messCount: 30, pigeonCount: 3, hoboCount: 1,
-        palette: { accent: '#40a060', sky: '#2a3a2a' }
+        palette: { accent: '#40a060', sky: '#283848', skyHorizon: '#d08050' }
     },
     {
         id: 5, name: "Haight-Ashbury", subtitle: "Vintage Refuse",
         timer: 60, messCount: 35, pigeonCount: 3, hoboCount: 2,
-        palette: { accent: '#e04080', sky: '#3a2a3a' }
+        palette: { accent: '#e04080', sky: '#302838', skyHorizon: '#c85848' }
     },
     {
         id: 6, name: "Mission District", subtitle: "Burrito Boulevard",
         timer: 60, messCount: 35, pigeonCount: 4, hoboCount: 2,
-        palette: { accent: '#e08040', sky: '#3a2a1a' }
+        palette: { accent: '#e08040', sky: '#302418', skyHorizon: '#d87838' }
     },
     {
         id: 7, name: "The Tenderloin", subtitle: "Danger Zone",
         timer: 60, messCount: 45, pigeonCount: 5, hoboCount: 4,
-        palette: { accent: '#c04040', sky: '#1a1a1a' }
+        palette: { accent: '#c04040', sky: '#1e1828', skyHorizon: '#a04830' }
     },
     {
         id: 8, name: "Golden Gate Park", subtitle: "Nature Fights Back",
         timer: 60, messCount: 40, pigeonCount: 5, hoboCount: 3,
-        palette: { accent: '#40c060', sky: '#1a2a1a' }
+        palette: { accent: '#40c060', sky: '#203828', skyHorizon: '#c89050' }
     },
     {
         id: 9, name: "Chinatown", subtitle: "Celebration Chaos",
         timer: 60, messCount: 40, pigeonCount: 4, hoboCount: 2,
-        palette: { accent: '#e04040', sky: '#2a1a1a' }
+        palette: { accent: '#e04040', sky: '#281820', skyHorizon: '#c05838' }
     },
     {
         id: 10, name: "City Hall", subtitle: "The Final Shift",
         timer: 60, messCount: 50, pigeonCount: 6, hoboCount: 5,
-        palette: { accent: '#c0c0d0', sky: '#1a1a2a' }
+        palette: { accent: '#c0c0d0', sky: '#202030', skyHorizon: '#b06848' }
     },
 ];
 
@@ -2065,7 +2065,7 @@ function drawTile(x, y) {
             ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
             // Sidewalk crack lines
             if ((x * 7 + y * 13) % 11 === 0) {
-                ctx.strokeStyle = '#9a9080';
+                ctx.strokeStyle = '#a09878';
                 ctx.lineWidth = 1;
                 ctx.beginPath();
                 ctx.moveTo(sx, sy + TILE_SIZE / 2);
@@ -2102,7 +2102,7 @@ function drawTile(x, y) {
             ctx.fillStyle = (x + y) % 2 === 0 ? COLORS.buildingWall : COLORS.buildingWallAlt;
             ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
             // Window
-            const windowLit = ((x * 3 + y * 7) % 5) < 2;
+            const windowLit = ((x * 3 + y * 7) % 5) < 3; // More lit windows — people waking up
             ctx.fillStyle = windowLit ? COLORS.buildingWindowLit : COLORS.buildingWindow;
             ctx.fillRect(sx + 6, sy + 4, TILE_SIZE - 12, TILE_SIZE - 8);
             // Window frame
@@ -2209,6 +2209,10 @@ function drawTile(x, y) {
 
         case TILE.WATER:
             ctx.fillStyle = COLORS.waterDeep;
+            ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+            // Sunrise reflection shimmer on water
+            const sunReflect = Math.sin(animCache.time * 1.5 + x * 0.7 + y * 0.3) * 0.12 + 0.08;
+            ctx.fillStyle = `rgba(255,160,80,${sunReflect})`;
             ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
             ctx.strokeStyle = COLORS.waterLight;
             ctx.lineWidth = 1;
@@ -2359,24 +2363,35 @@ function drawTile(x, y) {
 
     // === MESS OVERLAY ===
     if (mess !== MESS.NONE && clean !== CLEAN_STATE.CLEAN && clean !== CLEAN_STATE.SPARKLING) {
-        const messAlpha = clean === CLEAN_STATE.FILTHY ? 0.8 : 0.4;
+        const messAlpha = clean === CLEAN_STATE.FILTHY ? 0.95 : 0.6;
         ctx.globalAlpha = messAlpha;
 
         switch (mess) {
             case MESS.LITTER:
-                // Paper/cups scattered
-                ctx.fillStyle = COLORS.litterColor;
+                // Paper/cups scattered — bright white paper, tan cups
+                ctx.fillStyle = '#f0e8d0';
                 ctx.fillRect(sx + 4, sy + 8, 8, 6);
+                ctx.fillStyle = COLORS.litterColor;
                 ctx.fillRect(sx + 16, sy + 14, 6, 8);
-                ctx.fillStyle = '#e0d0b0';
+                ctx.fillStyle = '#f8f0e0';
                 ctx.fillRect(sx + 10, sy + 18, 10, 4);
+                // Coffee cup rim highlight
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(sx + 16, sy + 14, 6, 2);
                 break;
 
             case MESS.PUDDLE:
+                // Sunrise reflection makes puddles catch warm light
                 ctx.fillStyle = COLORS.puddleColor;
                 ctx.beginPath();
                 ctx.ellipse(sx + TILE_SIZE / 2, sy + TILE_SIZE / 2,
                     TILE_SIZE / 3, TILE_SIZE / 4, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // Warm sunrise reflection highlight
+                ctx.fillStyle = 'rgba(255,180,100,0.35)';
+                ctx.beginPath();
+                ctx.ellipse(sx + TILE_SIZE / 2 - 2, sy + TILE_SIZE / 2 - 2,
+                    TILE_SIZE / 5, TILE_SIZE / 6, 0, 0, Math.PI * 2);
                 ctx.fill();
                 break;
 
@@ -2391,19 +2406,28 @@ function drawTile(x, y) {
             case MESS.FOOD_WASTE:
                 ctx.fillStyle = COLORS.foodColor;
                 ctx.fillRect(sx + 6, sy + 8, 12, 10);
-                ctx.fillStyle = '#a06030';
+                ctx.fillStyle = '#c07838';
                 ctx.fillRect(sx + 14, sy + 6, 8, 6);
+                // Wrapper highlight
+                ctx.fillStyle = '#f0d090';
+                ctx.fillRect(sx + 6, sy + 8, 12, 2);
                 break;
 
             case MESS.MYSTERY:
-                // "Mystery puddle" - extra gross
+                // "Mystery puddle" - extra gross, more visible
                 ctx.fillStyle = COLORS.mysteryColor;
                 ctx.beginPath();
                 ctx.ellipse(sx + TILE_SIZE / 2, sy + TILE_SIZE / 2,
                     TILE_SIZE / 2.5, TILE_SIZE / 3, 0, 0, Math.PI * 2);
                 ctx.fill();
-                // Stink lines
-                ctx.strokeStyle = '#8a7a4a';
+                // Darker center for depth
+                ctx.fillStyle = 'rgba(80,60,20,0.4)';
+                ctx.beginPath();
+                ctx.ellipse(sx + TILE_SIZE / 2, sy + TILE_SIZE / 2 + 1,
+                    TILE_SIZE / 4, TILE_SIZE / 5, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // Stink lines (brighter yellow-green)
+                ctx.strokeStyle = '#b0a050';
                 ctx.lineWidth = 1;
                 for (let i = 0; i < 3; i++) {
                     const wx = sx + 8 + i * 8;
@@ -2418,13 +2442,13 @@ function drawTile(x, y) {
 
         ctx.globalAlpha = 1;
 
-        // Animated flies on FILTHY tiles
+        // Animated flies on FILTHY tiles (darker for contrast)
         if (clean === CLEAN_STATE.FILTHY) {
-            ctx.fillStyle = '#2a2a2a';
+            ctx.fillStyle = '#1a1a1a';
             for (let i = 0; i < 2; i++) {
                 const fx = sx + TILE_SIZE / 2 + Math.sin(animCache.time * 5 + i * 3 + x) * 8;
                 const fy = sy + 4 + Math.cos(animCache.time * 4 + i * 2 + y) * 4;
-                ctx.fillRect(fx, fy, 2, 2);
+                ctx.fillRect(fx, fy, 3, 3);
             }
         }
     }
@@ -4289,8 +4313,36 @@ function draw() {
     }
 }
 
+function drawSunriseBackground() {
+    const cw = canvas.width;
+    const ch = canvas.height;
+    const dist = DISTRICTS[gameState.district];
+    const skyTop = dist ? dist.palette.sky : '#202030';
+    const skyBot = dist && dist.palette.skyHorizon ? dist.palette.skyHorizon : '#c06040';
+
+    // Vertical gradient: dark pre-dawn sky at top → warm sunrise at bottom
+    const grad = ctx.createLinearGradient(0, 0, 0, ch);
+    grad.addColorStop(0.0, skyTop);
+    grad.addColorStop(0.5, skyTop);
+    grad.addColorStop(0.85, skyBot);
+    grad.addColorStop(1.0, skyBot);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, cw, ch);
+
+    // Subtle sun glow at bottom center
+    const glowGrad = ctx.createRadialGradient(cw * 0.5, ch, 0, cw * 0.5, ch, cw * 0.6);
+    glowGrad.addColorStop(0.0, 'rgba(255,180,80,0.18)');
+    glowGrad.addColorStop(0.4, 'rgba(255,120,50,0.08)');
+    glowGrad.addColorStop(1.0, 'rgba(255,80,30,0.0)');
+    ctx.fillStyle = glowGrad;
+    ctx.fillRect(0, 0, cw, ch);
+}
+
 function drawGameWorld() {
     if (!gameState.tiles || gameState.tiles.length === 0) return;
+
+    // Sunrise sky background (visible where tiles don't cover)
+    drawSunriseBackground();
 
     // Screen shake
     ctx.save();
@@ -4341,6 +4393,15 @@ function drawGameWorld() {
     ctx.restore();
     // Restore shake
     ctx.restore();
+
+    // === Early morning warm light overlay ===
+    // Subtle golden tint from the rising sun, stronger toward bottom of screen
+    const warmGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    warmGrad.addColorStop(0.0, 'rgba(255,180,100,0.0)');
+    warmGrad.addColorStop(0.6, 'rgba(255,160,80,0.04)');
+    warmGrad.addColorStop(1.0, 'rgba(255,140,60,0.10)');
+    ctx.fillStyle = warmGrad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
 // ============================================
