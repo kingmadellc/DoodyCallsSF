@@ -450,12 +450,12 @@ const CHARACTERS = [
         abilityDesc: '+20% move speed',
     },
     {
-        id: 'idaho-bro-1', name: 'Idahoan Brother #1', desc: 'Bald, bearded, built for reading',
+        id: 'idaho-bro-1', name: 'Idahoan Brother #1', desc: 'Bald, bearded, probably reading',
         color: '#608040', visorColor: '#a0d060', ability: 'armor',
         abilityDesc: 'Immune to first earthquake',
     },
     {
-        id: 'idaho-bro-2', name: 'Idahoan Brother #2', desc: 'Smells of pargumum and musk',
+        id: 'idaho-bro-2', name: 'Idahoan Brother #2', desc: 'Brewing essential oil potions, not cleaning',
         color: '#406830', visorColor: '#80c040', ability: 'scout',
         abilityDesc: '+30s time on first district',
     },
