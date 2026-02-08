@@ -2813,6 +2813,9 @@ function drawNewsTicker() {
 // ============================================
 // DRAWING - TITLE SCREEN
 // ============================================
+// ── Title screen card hit rects (rebuilt every frame) ──
+let titleCardRects = [];
+
 function drawTitleScreen() {
     const cw = canvas.width;
     const ch = canvas.height;
@@ -2820,14 +2823,14 @@ function drawTitleScreen() {
 
     // ── Layer 1: Sky gradient (pre-dawn atmosphere) ──
     const skyGrad = ctx.createLinearGradient(0, 0, 0, ch);
-    skyGrad.addColorStop(0.00, '#0a0a1e');   // deep space
-    skyGrad.addColorStop(0.15, '#141432');    // dark indigo
-    skyGrad.addColorStop(0.35, '#1e1440');    // purple
-    skyGrad.addColorStop(0.55, '#3d1a4a');    // warm purple
-    skyGrad.addColorStop(0.70, '#6b2040');    // magenta-red
-    skyGrad.addColorStop(0.82, '#c84820');    // deep orange
-    skyGrad.addColorStop(0.92, '#e87830');    // bright orange
-    skyGrad.addColorStop(1.00, '#f0a040');    // golden horizon
+    skyGrad.addColorStop(0.00, '#0a0a1e');
+    skyGrad.addColorStop(0.15, '#141432');
+    skyGrad.addColorStop(0.35, '#1e1440');
+    skyGrad.addColorStop(0.55, '#3d1a4a');
+    skyGrad.addColorStop(0.70, '#6b2040');
+    skyGrad.addColorStop(0.82, '#c84820');
+    skyGrad.addColorStop(0.92, '#e87830');
+    skyGrad.addColorStop(1.00, '#f0a040');
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, cw, ch);
 
@@ -2855,7 +2858,6 @@ function drawTitleScreen() {
         const sx = ((i * 137 + 47) % 600) + 20;
         const sy = ((i * 251 + 89) % (ch * 0.35));
         const size = (i % 3 === 0) ? 2 : 1;
-        // ~5 stars twinkle
         let alpha = 0.3 + (i * 73 % 50) / 100;
         if (i % 6 === 0) {
             alpha *= 0.5 + 0.5 * Math.sin(t * (0.8 + (i % 5) * 0.3) + i);
@@ -2866,38 +2868,18 @@ function drawTitleScreen() {
     }
     ctx.globalAlpha = 1;
 
-    // ── Layer 5–6: City skyline (both rows, anchored to canvas bottom) ──
+    // ── Layer 5–6: City skyline ──
     drawCitySkyline();
 
-    // ── Layer 7: Menu band (full-width gradient fade) ──
-    const bandTop = 216;
-    const bandSolid = 248;
-    const bandSolidEnd = 408;
-    const bandBottom = 440;
+    // ── Layer 7: Full-screen darken for readability ──
+    const darkGrad = ctx.createLinearGradient(0, ch * 0.28, 0, ch);
+    darkGrad.addColorStop(0, 'rgba(10,10,30,0.0)');
+    darkGrad.addColorStop(0.15, 'rgba(10,10,30,0.75)');
+    darkGrad.addColorStop(1, 'rgba(10,10,30,0.88)');
+    ctx.fillStyle = darkGrad;
+    ctx.fillRect(0, 0, cw, ch);
 
-    // Top fade in
-    const fadeInGrad = ctx.createLinearGradient(0, bandTop, 0, bandSolid);
-    fadeInGrad.addColorStop(0, 'rgba(10,10,30,0.0)');
-    fadeInGrad.addColorStop(1, 'rgba(10,10,30,0.85)');
-    ctx.fillStyle = fadeInGrad;
-    ctx.fillRect(0, bandTop, cw, bandSolid - bandTop);
-
-    // Solid middle
-    ctx.fillStyle = 'rgba(10,10,30,0.85)';
-    ctx.fillRect(0, bandSolid, cw, bandSolidEnd - bandSolid);
-
-    // Bottom fade out
-    const fadeOutGrad = ctx.createLinearGradient(0, bandSolidEnd, 0, bandBottom);
-    fadeOutGrad.addColorStop(0, 'rgba(10,10,30,0.85)');
-    fadeOutGrad.addColorStop(1, 'rgba(10,10,30,0.0)');
-    ctx.fillStyle = fadeOutGrad;
-    ctx.fillRect(0, bandSolidEnd, cw, bandBottom - bandSolidEnd);
-
-    // Thin accent line at top of solid band
-    ctx.fillStyle = 'rgba(78,205,196,0.3)';
-    ctx.fillRect(cw * 0.15, bandSolid, cw * 0.70, 1);
-
-    // ── Layer 8: Wordmark logo ──
+    // ── Layer 8: Wordmark logo (no fallback — just wait for asset) ──
     if (wordmarkImg.complete && wordmarkImg.naturalWidth > 0) {
         const logoW = cw * 0.52;
         const logoH = logoW * (wordmarkImg.naturalHeight / wordmarkImg.naturalWidth);
@@ -2905,105 +2887,116 @@ function drawTitleScreen() {
         const logoY = ch * 0.025;
         ctx.drawImage(wordmarkImg, logoX, logoY, logoW, logoH);
 
-        // Subtitle
         ctx.globalAlpha = 0.85;
         ctx.fillStyle = '#4ecdc4';
         ctx.font = `${Math.floor(cw * 0.022)}px monospace`;
         ctx.textAlign = 'center';
         ctx.fillText('San Francisco needs you before they wake up.', cw / 2, logoY + logoH - 8);
         ctx.globalAlpha = 1;
-    } else {
-        // Fallback text
-        const titleY = ch * 0.20;
-        ctx.fillStyle = '#ff8040';
-        ctx.font = `bold ${Math.floor(cw * 0.09)}px monospace`;
-        ctx.textAlign = 'center';
-        ctx.fillText('DOODY CALLS', cw / 2, titleY);
-
-        ctx.globalAlpha = 0.85;
-        ctx.fillStyle = '#4ecdc4';
-        ctx.font = `${Math.floor(cw * 0.022)}px monospace`;
-        ctx.fillText('San Francisco needs you before they wake up.', cw / 2, titleY + 35);
-        ctx.globalAlpha = 1;
     }
 
-    // ── Layer 9: Menu items ──
-    const menuY = ch * 0.4375;
-    const menuSpacing = 40;
+    // ── Layer 9: Touch-first card grid (2x2) ──
     const dailyDist = DISTRICTS[getDailyDistrictIndex()];
-    const menuItems = [
-        { label: 'START SHIFT', desc: 'Begin District 1' },
-        { label: 'QUICK SHIFT', desc: 'Random district' },
-        { label: 'DISTRICT SELECT', desc: `${gameState.districtsUnlocked}/${DISTRICTS.length} unlocked | Grade: ${gameState.cityGrade}` },
-        { label: 'DAILY CHALLENGE', desc: `Today: ${dailyDist.name}` },
+    const selectedIndex = gameState._menuIndex || 0;
+    const cardItems = [
+        { icon: '\u{1F9F9}', label: 'START', desc: 'Begin District 1', accent: '#4ecdc4' },
+        { icon: '\u26A1',    label: 'QUICK', desc: 'Random district', accent: '#ff8040' },
+        { icon: '\u{1F5FA}', label: 'DISTRICTS', desc: `${gameState.districtsUnlocked}/${DISTRICTS.length} unlocked`, accent: '#ffe66d' },
+        { icon: '\u{1F4C5}', label: 'DAILY', desc: dailyDist.name, accent: '#ff6b9d' },
     ];
 
-    const selectedIndex = gameState._menuIndex || 0;
+    const pad = Math.floor(cw * 0.03);
+    const gridW = cw - pad * 2;
+    const gap = Math.floor(cw * 0.025);
+    const cardW = Math.floor((gridW - gap) / 2);
+    const cardH = Math.floor(ch * 0.17);
+    const gridTop = ch * 0.39;
+    const gridLeft = pad;
+    const cornerR = 8;
 
-    for (let i = 0; i < menuItems.length; i++) {
-        const y = menuY + i * menuSpacing;
+    titleCardRects = [];
+
+    for (let i = 0; i < 4; i++) {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const cx = gridLeft + col * (cardW + gap);
+        const cy = gridTop + row * (cardH + gap);
+        const item = cardItems[i];
         const selected = i === selectedIndex;
 
+        titleCardRects.push({ x: cx, y: cy, w: cardW, h: cardH, idx: i });
+
+        // Card press scale animation
+        const pressScale = (selected && gameState._cardPressAnim) ? 0.97 : 1.0;
+        const centerX = cx + cardW / 2;
+        const centerY = cy + cardH / 2;
+
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.scale(pressScale, pressScale);
+        ctx.translate(-centerX, -centerY);
+
+        // Card background
+        const bgAlpha = selected ? 0.25 : 0.12;
+        ctx.fillStyle = selected
+            ? `rgba(78,205,196,${bgAlpha})`
+            : `rgba(255,255,255,${bgAlpha})`;
+        ctx.beginPath();
+        ctx.roundRect(cx, cy, cardW, cardH, cornerR);
+        ctx.fill();
+
+        // Card border
+        ctx.strokeStyle = selected ? item.accent : 'rgba(255,255,255,0.12)';
+        ctx.lineWidth = selected ? 2 : 1;
+        ctx.beginPath();
+        ctx.roundRect(cx, cy, cardW, cardH, cornerR);
+        ctx.stroke();
+
+        // Selected glow
         if (selected) {
-            ctx.fillStyle = '#4ecdc4';
-            ctx.font = `bold ${Math.floor(cw * 0.038)}px monospace`;
-            ctx.globalAlpha = 1.0;
-            ctx.shadowColor = 'rgba(78,205,196,0.5)';
-            ctx.shadowBlur = 12;
-        } else {
-            ctx.fillStyle = '#7888a0';
-            ctx.font = `bold ${Math.floor(cw * 0.032)}px monospace`;
-            ctx.globalAlpha = 0.6;
+            ctx.shadowColor = item.accent;
+            ctx.shadowBlur = 16;
+            ctx.strokeStyle = item.accent + '60';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(cx, cy, cardW, cardH, cornerR);
+            ctx.stroke();
             ctx.shadowColor = 'transparent';
             ctx.shadowBlur = 0;
         }
 
+        // Icon
+        const iconSize = Math.floor(cardH * 0.38);
+        ctx.font = `${iconSize}px sans-serif`;
         ctx.textAlign = 'center';
-        ctx.fillText(menuItems[i].label, cw / 2, y);
-        ctx.shadowColor = 'transparent';
-        ctx.shadowBlur = 0;
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(item.icon, cx + cardW * 0.22, cy + cardH * 0.42);
+        ctx.textBaseline = 'alphabetic';
+
+        // Label
+        const labelSize = Math.floor(cw * 0.032);
+        ctx.fillStyle = selected ? item.accent : '#d0d8e0';
+        ctx.font = `bold ${labelSize}px monospace`;
+        ctx.textAlign = 'left';
+        ctx.fillText(item.label, cx + cardW * 0.40, cy + cardH * 0.40);
 
         // Description
-        if (selected) {
-            ctx.fillStyle = '#a0b0c0';
-            ctx.font = `${Math.floor(cw * 0.019)}px monospace`;
-            ctx.globalAlpha = 0.7;
-        } else {
-            ctx.fillStyle = '#506070';
-            ctx.font = `${Math.floor(cw * 0.017)}px monospace`;
-            ctx.globalAlpha = 0.4;
-        }
-        ctx.fillText(menuItems[i].desc, cw / 2, y + 16);
+        const descSize = Math.floor(cw * 0.018);
+        ctx.fillStyle = selected ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.4)';
+        ctx.font = `${descSize}px monospace`;
+        ctx.fillText(item.desc, cx + cardW * 0.40, cy + cardH * 0.62);
+
+        ctx.restore();
     }
-    ctx.globalAlpha = 1;
 
-    // ── Layer 10: Selection arrow ──
-    const arrowY = menuY + selectedIndex * menuSpacing;
-    const arrowBounce = Math.sin(t * 5) * 3;
-    ctx.fillStyle = '#4ecdc4';
-    ctx.font = `bold ${Math.floor(cw * 0.038)}px monospace`;
-    ctx.textAlign = 'right';
-    ctx.shadowColor = 'rgba(78,205,196,0.4)';
-    ctx.shadowBlur = 8;
-    ctx.fillText('>', cw / 2 - 105 + arrowBounce, arrowY);
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
-
-    // ── Layer 11: Footer ──
-    ctx.globalAlpha = 0.6;
-    ctx.fillStyle = '#506070';
-    ctx.font = `${Math.floor(cw * 0.017)}px monospace`;
-    ctx.textAlign = 'center';
-    ctx.fillText(isMobile
-        ? 'Swipe to move  |  Tap to clean  |  Tap to select'
-        : 'Arrow Keys / WASD to move  |  Space to clean  |  Enter to select',
-                 cw / 2, ch - 36);
-
+    // ── Layer 10: Footer ──
     ctx.globalAlpha = 0.5;
     ctx.fillStyle = '#384050';
-    ctx.font = `${Math.floor(cw * 0.015)}px monospace`;
+    ctx.font = `${Math.floor(cw * 0.014)}px monospace`;
+    ctx.textAlign = 'center';
     ctx.fillText('A Kingmade LLC Production  |  Built with love in San Francisco',
-                 cw / 2, ch - 18);
+                 cw / 2, ch - 14);
     ctx.globalAlpha = 1;
 }
 
