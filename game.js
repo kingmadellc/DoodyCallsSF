@@ -566,6 +566,20 @@ let gameState = {
     scoreCopied: false,
 };
 
+// Mobile detection (touch-capable device)
+const isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+// Hit rect for the share card (in canvas coordinates), set each frame by drawScoreShare
+let shareCardRect = null;  // { x, y, w, h } in canvas coords, or null when not visible
+
+// Persistent touch direction for smooth in-game movement (bypasses shouldMove gating)
+// Set by the touch system, cleared on touchend. Read directly by updatePlayer.
+let touchDir = { x: 0, y: 0 };  // -1, 0, or 1 for each axis
+
+// Hit rects for mobile UI buttons, set each frame by draw functions
+let mobileBackBtnRect = null;   // { x, y, w, h } in canvas coords
+let mobileFinishBtnRect = null; // { x, y, w, h } in canvas coords
+
 // ============================================
 // INPUT SYSTEM
 // ============================================
@@ -574,6 +588,7 @@ let keyPressTime = {};
 let keyMoved = {};
 let keyBuffer = {};  // Buffer for one-shot keys (survives until consumed by a frame)
 const MOVE_DELAY = 100;
+const MOBILE_MOVE_DELAY = 65;   // Faster tile movement on touch (was 100 — ~15 tiles/sec vs ~10)
 const HOLD_THRESHOLD = 150;
 
 const inputActions = {
@@ -1158,12 +1173,26 @@ function updatePlayer(dt) {
     p.moveTimer -= dt;
     p.frame += dt * 6;
 
-    // Movement
+    // Movement — keyboard input via shouldMove(), touch input via persistent touchDir
     let dx = 0, dy = 0;
-    if (inputActions.up) { dy = -1; p.direction = 2; }
-    else if (inputActions.down) { dy = 1; p.direction = 0; }
-    else if (inputActions.left) { dx = -1; p.direction = 1; }
-    else if (inputActions.right) { dx = 1; p.direction = 3; }
+    if (touchDir.x !== 0 || touchDir.y !== 0) {
+        // Touch: use persistent direction directly (no shouldMove gating)
+        dx = touchDir.x;
+        dy = touchDir.y;
+    } else {
+        // Keyboard
+        if (inputActions.up) { dy = -1; }
+        else if (inputActions.down) { dy = 1; }
+        else if (inputActions.left) { dx = -1; }
+        else if (inputActions.right) { dx = 1; }
+    }
+    if (dy === -1) p.direction = 2;
+    else if (dy === 1) p.direction = 0;
+    else if (dx === -1) p.direction = 1;
+    else if (dx === 1) p.direction = 3;
+
+    // Use faster move delay on mobile for snappier feel
+    const effectiveMoveDelay = (touchDir.x !== 0 || touchDir.y !== 0) ? MOBILE_MOVE_DELAY : MOVE_DELAY;
 
     if ((dx !== 0 || dy !== 0) && p.moveTimer <= 0) {
         const nx = p.x + dx;
@@ -1172,7 +1201,7 @@ function updatePlayer(dt) {
             !isBlockingTile(gameState.tiles[ny][nx])) {
             p.x = nx;
             p.y = ny;
-            p.moveTimer = (MOVE_DELAY / 1000) * p.speed;
+            p.moveTimer = (effectiveMoveDelay / 1000) * p.speed;
 
             // Auto-clean when walking over messy tiles
             tryCleanTile(nx, ny);
@@ -1744,8 +1773,29 @@ function generateScoreText(stars) {
     return lines.join('\n');
 }
 
-function copyScoreToClipboard() {
+function shareScore() {
     const text = gameState.lastScoreText;
+    if (!text) return;
+
+    // On mobile, prefer the native Web Share API (share sheet)
+    if (isMobile && navigator.share) {
+        navigator.share({
+            title: 'DOODY CALLS',
+            text: text,
+        }).then(() => {
+            gameState.scoreCopied = true;
+        }).catch(() => {
+            // User cancelled or share failed — fall through to clipboard
+            copyToClipboard(text);
+        });
+        return;
+    }
+
+    // Desktop or no Web Share: copy to clipboard
+    copyToClipboard(text);
+}
+
+function copyToClipboard(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(() => {
             gameState.scoreCopied = true;
@@ -2683,6 +2733,25 @@ function drawHUD() {
         ctx.fillText('EARTHQUAKE!', canvas.width / 2, canvas.height / 2 - 20);
     }
 
+    // === MOBILE: Finish Shift button when >= 60% clean ===
+    mobileFinishBtnRect = null;
+    if (isMobile && pct >= 60) {
+        const bw = 100, bh = 26;
+        const bx = canvas.width / 2 - bw / 2;
+        const by = canvas.height - 50;
+        mobileFinishBtnRect = { x: bx, y: by, w: bw, h: bh };
+
+        const pulse = Math.sin(animCache.time * 4) * 0.15 + 0.85;
+        ctx.globalAlpha = pulse;
+        ctx.fillStyle = COLORS.uiAccent;
+        ctx.fillRect(bx, by, bw, bh);
+        ctx.fillStyle = '#0a0a1e';
+        ctx.font = 'bold 11px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('FINISH SHIFT', bx + bw / 2, by + 17);
+        ctx.globalAlpha = 1;
+    }
+
     // === NEWS TICKER at bottom ===
     drawNewsTicker();
 
@@ -2925,7 +2994,9 @@ function drawTitleScreen() {
     ctx.fillStyle = '#506070';
     ctx.font = `${Math.floor(cw * 0.017)}px monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText('Arrow Keys / WASD to move  |  Space to clean  |  Enter to select',
+    ctx.fillText(isMobile
+        ? 'Swipe to move  |  Tap to clean  |  Tap to select'
+        : 'Arrow Keys / WASD to move  |  Space to clean  |  Enter to select',
                  cw / 2, ch - 36);
 
     ctx.globalAlpha = 0.5;
@@ -3082,7 +3153,7 @@ function drawGameOverScreen() {
     if (blink) {
         ctx.fillStyle = COLORS.uiAccent;
         ctx.font = 'bold 14px monospace';
-        ctx.fillText('Press ENTER to try again', canvas.width / 2, canvas.height * 0.85);
+        ctx.fillText(isMobile ? 'Tap to try again' : 'Press ENTER to try again', canvas.width / 2, canvas.height * 0.85);
     }
 }
 
@@ -3149,14 +3220,17 @@ function drawDistrictCompleteScreen() {
         ctx.textAlign = 'center';
         const nextDist = gameState.district + 1;
         if (nextDist < DISTRICTS.length) {
-            ctx.fillText(`Press ENTER for ${DISTRICTS[nextDist].name}`, canvas.width / 2, canvas.height * 0.92);
+            ctx.fillText(isMobile ? `Tap for ${DISTRICTS[nextDist].name}` : `Press ENTER for ${DISTRICTS[nextDist].name}`, canvas.width / 2, canvas.height * 0.92);
         } else {
-            ctx.fillText('Press ENTER — All districts complete!', canvas.width / 2, canvas.height * 0.92);
+            ctx.fillText(isMobile ? 'Tap — All districts complete!' : 'Press ENTER — All districts complete!', canvas.width / 2, canvas.height * 0.92);
         }
     }
 }
 
 function drawScoreShare(x, y, w, h, stars) {
+    // Store hit rect for tap-to-share on mobile
+    shareCardRect = { x, y, w, h };
+
     // Share card background
     ctx.fillStyle = '#1a1a2e';
     ctx.strokeStyle = gameState.scoreCopied ? '#4ecdc4' : '#333';
@@ -3176,6 +3250,9 @@ function drawScoreShare(x, y, w, h, stars) {
     if (gameState.scoreCopied) {
         ctx.fillStyle = COLORS.uiAccent;
         ctx.fillText('COPIED TO CLIPBOARD!', x + 8, y + 14);
+    } else if (isMobile) {
+        ctx.fillStyle = COLORS.uiAccent;
+        ctx.fillText('\u261D TAP HERE TO SHARE', x + 8, y + 14);
     } else {
         ctx.fillText('Press C to copy score & share:', x + 8, y + 14);
     }
@@ -3282,7 +3359,27 @@ function drawCharSelectScreen() {
         ctx.fillStyle = COLORS.uiAccent;
         ctx.font = 'bold 12px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('ENTER to confirm  •  ESC to go back', canvas.width / 2, canvas.height * 0.92);
+        if (isMobile) {
+            ctx.fillText('Tap center to confirm  •  Swipe to browse', canvas.width / 2, canvas.height * 0.90);
+        } else {
+            ctx.fillText('ENTER to confirm  •  ESC to go back', canvas.width / 2, canvas.height * 0.92);
+        }
+    }
+
+    // Mobile back button
+    if (isMobile) {
+        const bw = 60, bh = 28;
+        const bx = 10, by = 10;
+        mobileBackBtnRect = { x: bx, y: by, w: bw, h: bh };
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.fillRect(bx, by, bw, bh);
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(bx, by, bw, bh);
+        ctx.fillStyle = '#aaa';
+        ctx.font = 'bold 12px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('← Back', bx + bw / 2, by + 18);
     }
 }
 
@@ -3381,7 +3478,27 @@ function drawDistrictSelectScreen() {
     ctx.fillStyle = '#555';
     ctx.font = '10px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('ENTER to play  •  ESC to go back', canvas.width / 2, canvas.height - 15);
+    if (isMobile) {
+        ctx.fillText('Tap district to select  •  Tap again to play', canvas.width / 2, canvas.height - 15);
+    } else {
+        ctx.fillText('ENTER to play  •  ESC to go back', canvas.width / 2, canvas.height - 15);
+    }
+
+    // Mobile back button
+    if (isMobile) {
+        const bw = 60, bh = 28;
+        const bx = 10, by = 5;
+        mobileBackBtnRect = { x: bx, y: by, w: bw, h: bh };
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.fillRect(bx, by, bw, bh);
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(bx, by, bw, bh);
+        ctx.fillStyle = '#aaa';
+        ctx.font = 'bold 12px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('← Back', bx + bw / 2, by + 18);
+    }
 }
 
 // ============================================
@@ -3439,7 +3556,7 @@ function update(dt) {
         updateParticles(dt);
         // C key to copy score
         if (keys['KeyC'] || keyBuffer['KeyC']) {
-            copyScoreToClipboard();
+            shareScore();
         }
         if (inputActions.confirm) {
             startDistrict(gameState.district);
@@ -3447,7 +3564,7 @@ function update(dt) {
     } else if (gameState.screen === 'districtComplete') {
         // C key to copy score
         if (keys['KeyC'] || keyBuffer['KeyC']) {
-            copyScoreToClipboard();
+            shareScore();
         }
         if (inputActions.confirm) {
             const nextDist = gameState.district + 1;
@@ -3562,6 +3679,11 @@ function updateDistrictSelect(dt) {
 // MAIN DRAW
 // ============================================
 function draw() {
+    // Clear UI hit rects (will be set by draw functions if visible)
+    shareCardRect = null;
+    mobileBackBtnRect = null;
+    mobileFinishBtnRect = null;
+
     // Clear
     ctx.fillStyle = COLORS.uiBg;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -3698,19 +3820,161 @@ function initGame() {
         keyMoved[e.code] = false;
     });
 
-    // Touch/swipe controls for mobile
+    // ================================================================
+    // TOUCH / SWIPE CONTROLS FOR MOBILE
+    // ================================================================
+    // Architecture:
+    //   - During GAMEPLAY: sets persistent `touchDir` for smooth continuous movement.
+    //     Player movement reads touchDir directly, bypassing keyboard shouldMove gates.
+    //   - During MENUS: fires one-shot key events for instant response.
+    //   - Taps are context-aware: left/right zones on char select, district rows, etc.
+    // ================================================================
     let touchStartX = 0;
     let touchStartY = 0;
     let touchStartTime = 0;
     let touchActive = false;
-    const SWIPE_THRESHOLD = 20;  // min pixels for swipe
-    const TAP_THRESHOLD = 15;    // max pixels for tap
+    let touchSwiped = false;          // True if any swipe occurred during this touch
+    const SWIPE_THRESHOLD = 12;       // min pixels for initial swipe detection
+    const DRAG_THRESHOLD = 10;        // pixels to re-detect direction while dragging
+    const TAP_THRESHOLD = 14;         // max movement for a touch to count as a tap
 
-    function clearTouchKeys() {
-        keys['SwipeUp'] = false;
-        keys['SwipeDown'] = false;
-        keys['SwipeLeft'] = false;
-        keys['SwipeRight'] = false;
+    // Convert client coords to canvas coords
+    function clientToCanvas(clientX, clientY) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: (clientX - rect.left) * (canvas.width / rect.width),
+            y: (clientY - rect.top) * (canvas.height / rect.height),
+        };
+    }
+
+    // Fire a virtual key press (one-shot, for menus)
+    function fireKey(code) {
+        keyBuffer[code] = true;
+        keys[code] = true;
+        keyPressTime[code] = Date.now();
+        keyMoved[code] = false;
+        setTimeout(() => { keys[code] = false; }, 60);
+    }
+
+    // Determine the cardinal direction from dx/dy
+    function getSwipeDir(dx, dy) {
+        if (Math.abs(dx) > Math.abs(dy)) {
+            return dx > 0 ? 'right' : 'left';
+        }
+        return dy > 0 ? 'down' : 'up';
+    }
+
+    // ── Handle swipe on MENU screens (one-shot actions) ──
+    function handleMenuSwipe(dir) {
+        const screen = gameState.screen;
+
+        if (screen === 'charSelect') {
+            if (dir === 'left')  { fireKey('ArrowLeft');  return true; }
+            if (dir === 'right') { fireKey('ArrowRight'); return true; }
+            if (dir === 'down')  { fireKey('Escape');     return true; }  // Back
+            return false;
+        }
+
+        if (screen === 'districtSelect') {
+            if (dir === 'up')    { fireKey('ArrowUp');    return true; }
+            if (dir === 'down')  { fireKey('ArrowDown');  return true; }
+            if (dir === 'left')  { fireKey('Escape');     return true; }  // Back
+            return false;
+        }
+
+        if (screen === 'title') {
+            if (dir === 'up')   { fireKey('ArrowUp');   return true; }
+            if (dir === 'down') { fireKey('ArrowDown'); return true; }
+            return false;
+        }
+
+        return false;
+    }
+
+    // ── Handle tap on MENU screens (context-aware) ──
+    function handleMenuTap(canvasX, canvasY) {
+        const screen = gameState.screen;
+        const cw = canvas.width;
+        const ch = canvas.height;
+
+        // Check mobile back button on any screen
+        if (mobileBackBtnRect &&
+            canvasX >= mobileBackBtnRect.x && canvasX <= mobileBackBtnRect.x + mobileBackBtnRect.w &&
+            canvasY >= mobileBackBtnRect.y && canvasY <= mobileBackBtnRect.y + mobileBackBtnRect.h) {
+            fireKey('Escape');
+            return true;
+        }
+
+        // Character Select: left zone / right zone / center confirm
+        if (screen === 'charSelect') {
+            if (canvasX < cw * 0.25) {
+                fireKey('ArrowLeft');
+                return true;
+            }
+            if (canvasX > cw * 0.75) {
+                fireKey('ArrowRight');
+                return true;
+            }
+            // Center = confirm
+            fireKey('Space');
+            return true;
+        }
+
+        // District Select: tap a row to select, tap selected row to confirm
+        if (screen === 'districtSelect') {
+            const listY = 75;
+            const itemH = 52;
+            const idx = gameState._distSelectIndex || 0;
+            const scrollOffset = Math.max(0, idx - 4) * itemH;
+
+            const relY = canvasY - listY + scrollOffset;
+            if (canvasY >= listY && canvasY < ch - 40 && relY >= 0) {
+                const tappedIdx = Math.floor(relY / itemH);
+                if (tappedIdx >= 0 && tappedIdx < DISTRICTS.length) {
+                    if (tappedIdx === gameState._distSelectIndex) {
+                        fireKey('Space');  // Confirm
+                    } else {
+                        gameState._distSelectIndex = tappedIdx;
+                    }
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Game Over / District Complete: share card tap, or confirm
+        if (screen === 'gameOver' || screen === 'districtComplete') {
+            if (shareCardRect &&
+                canvasX >= shareCardRect.x && canvasX <= shareCardRect.x + shareCardRect.w &&
+                canvasY >= shareCardRect.y && canvasY <= shareCardRect.y + shareCardRect.h) {
+                shareScore();
+                return true;
+            }
+            fireKey('Space');
+            return true;
+        }
+
+        // Title: tap = confirm
+        if (screen === 'title') {
+            fireKey('Space');
+            return true;
+        }
+
+        return false;
+    }
+
+    // ── Handle tap during GAMEPLAY ──
+    function handlePlayTap(canvasX, canvasY) {
+        // Check finish-shift button
+        if (mobileFinishBtnRect &&
+            canvasX >= mobileFinishBtnRect.x && canvasX <= mobileFinishBtnRect.x + mobileFinishBtnRect.w &&
+            canvasY >= mobileFinishBtnRect.y && canvasY <= mobileFinishBtnRect.y + mobileFinishBtnRect.h) {
+            fireKey('Escape');  // Triggers finish shift via inputActions.pause
+            return true;
+        }
+        // Otherwise tap = clean action
+        fireKey('Space');
+        return true;
     }
 
     canvas.addEventListener('touchstart', (e) => {
@@ -3720,7 +3984,7 @@ function initGame() {
         touchStartY = touch.clientY;
         touchStartTime = Date.now();
         touchActive = true;
-        clearTouchKeys();
+        touchSwiped = false;
     }, { passive: false });
 
     canvas.addEventListener('touchmove', (e) => {
@@ -3731,22 +3995,22 @@ function initGame() {
         const dy = touch.clientY - touchStartY;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (dist >= SWIPE_THRESHOLD) {
-            clearTouchKeys();
-            if (Math.abs(dx) > Math.abs(dy)) {
-                const dir = dx > 0 ? 'SwipeRight' : 'SwipeLeft';
-                keys[dir] = true;
-                keyBuffer[dir] = true;
-                keyPressTime[dir] = Date.now();
-                keyMoved[dir] = false;
+        const threshold = touchSwiped ? DRAG_THRESHOLD : SWIPE_THRESHOLD;
+
+        if (dist >= threshold) {
+            const dir = getSwipeDir(dx, dy);
+            touchSwiped = true;
+
+            if (gameState.screen === 'playing') {
+                // ── GAMEPLAY: set persistent touchDir for smooth movement ──
+                touchDir.x = (dir === 'left') ? -1 : (dir === 'right') ? 1 : 0;
+                touchDir.y = (dir === 'up')   ? -1 : (dir === 'down')  ? 1 : 0;
             } else {
-                const dir = dy > 0 ? 'SwipeDown' : 'SwipeUp';
-                keys[dir] = true;
-                keyBuffer[dir] = true;
-                keyPressTime[dir] = Date.now();
-                keyMoved[dir] = false;
+                // ── MENUS: fire one-shot directional input ──
+                handleMenuSwipe(dir);
             }
-            // Reset start point for continuous swipe movement
+
+            // Reset anchor for next drag step
             touchStartX = touch.clientX;
             touchStartY = touch.clientY;
         }
@@ -3757,20 +4021,26 @@ function initGame() {
         if (!touchActive) return;
         touchActive = false;
 
+        // Always clear persistent touch direction
+        touchDir.x = 0;
+        touchDir.y = 0;
+
         const elapsed = Date.now() - touchStartTime;
         const touch = e.changedTouches[0];
-        const dx = touch.clientX - touchStartX;
-        const dy = touch.clientY - touchStartY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+        const tdx = touch.clientX - touchStartX;
+        const tdy = touch.clientY - touchStartY;
+        const dist = Math.sqrt(tdx * tdx + tdy * tdy);
 
-        // Tap = confirm/action
-        if (dist < TAP_THRESHOLD && elapsed < 300) {
-            keyBuffer['Space'] = true;
-            keys['Space'] = true;
-            setTimeout(() => { keys['Space'] = false; }, 50);
+        // Tap detection: small movement + short duration + no swipe occurred
+        if (dist < TAP_THRESHOLD && elapsed < 300 && !touchSwiped) {
+            const c = clientToCanvas(touch.clientX, touch.clientY);
+
+            if (gameState.screen === 'playing') {
+                handlePlayTap(c.x, c.y);
+            } else {
+                handleMenuTap(c.x, c.y);
+            }
         }
-
-        clearTouchKeys();
     }, { passive: false });
 
     // Load saved progress
