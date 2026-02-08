@@ -490,7 +490,7 @@ wordmarkImg.src = 'assets/wordmark.png';
 // ============================================
 let gameState = {
     // Core
-    screen: 'title',  // title, playing, paused, gameOver, districtComplete, allComplete, charSelect, districtSelect
+    screen: 'title',  // title, playing, paused, gameOver, districtComplete, charSelect, districtSelect
     district: 0,       // Index into DISTRICTS array
     timer: 60,
     started: false,
@@ -564,6 +564,9 @@ let gameState = {
     // Score sharing
     lastScoreText: '',    // Generated score text for clipboard
     scoreCopied: false,
+
+    // Pause menu
+    pauseMenuIndex: 0,    // Currently selected pause menu item
 };
 
 // Mobile detection (touch-capable device)
@@ -579,6 +582,9 @@ let touchDir = { x: 0, y: 0 };  // -1, 0, or 1 for each axis
 // Hit rects for mobile UI buttons, set each frame by draw functions
 let mobileBackBtnRect = null;   // { x, y, w, h } in canvas coords
 let mobileFinishBtnRect = null; // { x, y, w, h } in canvas coords
+let mobilePauseBtnRect = null;  // { x, y, w, h } in canvas coords
+let pauseMenuRects = [];        // Array of { x, y, w, h, idx } for pause menu items
+let endScreenCardRects = [];    // Array of { x, y, w, h, action } for end screen buttons
 
 // ============================================
 // INPUT SYSTEM
@@ -1871,6 +1877,7 @@ function updateTimer(dt) {
         gameState.timer = 0;
         gameState.timeBonus = 0;
         gameState.screen = 'gameOver';
+        gameState._endMenuIndex = 0;
         triggerShake(0.5, 12);
         // Generate score text for sharing
         gameState.lastScoreText = generateScoreText(0);
@@ -1928,6 +1935,23 @@ function startDistrict(districtIndex) {
     gameState.camera.y = gameState.player.y - VIEWPORT_HEIGHT / 2;
 }
 
+function executeEndScreenAction(action) {
+    if (action === 'retry') {
+        startDistrict(gameState.district);
+    } else if (action === 'next') {
+        const nextDist = gameState.district + 1;
+        if (nextDist < DISTRICTS.length) {
+            startDistrict(nextDist);
+        } else {
+            gameState.screen = 'title';
+        }
+    } else if (action === 'replay') {
+        startDistrict(gameState.district);
+    } else if (action === 'menu') {
+        gameState.screen = 'title';
+    }
+}
+
 function completeDistrict() {
     const pct = gameState.totalMesses > 0 ? (gameState.messesClean / gameState.totalMesses) : 0;
     const pctInt = Math.floor(pct * 100);
@@ -1979,6 +2003,7 @@ function completeDistrict() {
 
     gameState.timeBonus = Math.floor(timeLeft);
     gameState.screen = 'districtComplete';
+    gameState._endMenuIndex = 0;
 
     // Generate score share text
     gameState.lastScoreText = generateScoreText(stars);
@@ -2725,10 +2750,29 @@ function drawHUD() {
         ctx.fillText('EARTHQUAKE!', canvas.width / 2, canvas.height / 2 - 20);
     }
 
-    // === MOBILE: Finish Shift button when >= 60% clean ===
+    // === Pause button (all platforms) ===
+    const pbSize = 28;
+    const pbX = canvas.width - pbSize - 6;
+    const pbY = 4;
+    mobilePauseBtnRect = { x: pbX, y: pbY, w: pbSize, h: pbSize };
+    ctx.fillStyle = 'rgba(255,255,255,0.10)';
+    ctx.beginPath();
+    ctx.roundRect(pbX, pbY, pbSize, pbSize, 4);
+    ctx.fill();
+    // Draw pause icon (two vertical bars)
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    const barW = 4, barH = 14;
+    const barGap = 5;
+    const barsX = pbX + (pbSize - barW * 2 - barGap) / 2;
+    const barsY = pbY + (pbSize - barH) / 2;
+    ctx.fillRect(barsX, barsY, barW, barH);
+    ctx.fillRect(barsX + barW + barGap, barsY, barW, barH);
+
+    // === Finish Shift button when >= 60% clean ===
     mobileFinishBtnRect = null;
-    if (isMobile && pct >= 60) {
-        const bw = 100, bh = 26;
+    if (pct >= 60) {
+        const label = isMobile ? 'FINISH SHIFT' : 'FINISH SHIFT [F]';
+        const bw = isMobile ? 100 : 120, bh = 26;
         const bx = canvas.width / 2 - bw / 2;
         const by = canvas.height - 50;
         mobileFinishBtnRect = { x: bx, y: by, w: bw, h: bh };
@@ -2736,11 +2780,13 @@ function drawHUD() {
         const pulse = Math.sin(animCache.time * 4) * 0.15 + 0.85;
         ctx.globalAlpha = pulse;
         ctx.fillStyle = COLORS.uiAccent;
-        ctx.fillRect(bx, by, bw, bh);
+        ctx.beginPath();
+        ctx.roundRect(bx, by, bw, bh, 6);
+        ctx.fill();
         ctx.fillStyle = '#0a0a1e';
         ctx.font = 'bold 11px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('FINISH SHIFT', bx + bw / 2, by + 17);
+        ctx.fillText(label, bx + bw / 2, by + 17);
         ctx.globalAlpha = 1;
     }
 
@@ -2758,6 +2804,108 @@ function drawHUD() {
         grad.addColorStop(1, `rgba(255,0,0,${vigor})`);
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+}
+
+function drawPauseMenu() {
+    const cw = canvas.width;
+    const ch = canvas.height;
+
+    // Dim overlay
+    ctx.fillStyle = 'rgba(10,10,30,0.80)';
+    ctx.fillRect(0, 0, cw, ch);
+
+    // Title
+    ctx.fillStyle = '#4ecdc4';
+    ctx.font = `bold ${Math.floor(cw * 0.07)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText('PAUSED', cw / 2, ch * 0.28);
+
+    // Menu items
+    const items = ['Resume', 'Restart District', 'Quit to Menu'];
+    const itemH = Math.floor(ch * 0.09);
+    const itemW = Math.floor(cw * 0.6);
+    const startY = ch * 0.38;
+    const idx = gameState.pauseMenuIndex;
+
+    pauseMenuRects = [];
+
+    for (let i = 0; i < items.length; i++) {
+        const x = (cw - itemW) / 2;
+        const y = startY + i * (itemH + 10);
+        const selected = i === idx;
+
+        pauseMenuRects.push({ x, y, w: itemW, h: itemH, idx: i });
+
+        // Button background
+        ctx.fillStyle = selected ? 'rgba(78,205,196,0.20)' : 'rgba(255,255,255,0.06)';
+        ctx.beginPath();
+        ctx.roundRect(x, y, itemW, itemH, 8);
+        ctx.fill();
+
+        // Button border
+        ctx.strokeStyle = selected ? '#4ecdc4' : 'rgba(255,255,255,0.12)';
+        ctx.lineWidth = selected ? 2 : 1;
+        ctx.beginPath();
+        ctx.roundRect(x, y, itemW, itemH, 8);
+        ctx.stroke();
+
+        // Selected glow
+        if (selected) {
+            ctx.shadowColor = '#4ecdc4';
+            ctx.shadowBlur = 12;
+            ctx.beginPath();
+            ctx.roundRect(x, y, itemW, itemH, 8);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        // Label
+        ctx.fillStyle = selected ? '#ffffff' : 'rgba(255,255,255,0.6)';
+        ctx.font = `bold ${Math.floor(cw * 0.035)}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText(items[i], cw / 2, y + itemH / 2 + Math.floor(cw * 0.012));
+    }
+
+    // Controls hint
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.font = `${Math.floor(cw * 0.02)}px monospace`;
+    ctx.textAlign = 'center';
+    const hintY = startY + items.length * (itemH + 10) + 30;
+    if (isMobile) {
+        ctx.fillText('Tap to select', cw / 2, hintY);
+    } else {
+        ctx.fillText('↑↓ Navigate  •  Enter Select  •  Esc Resume', cw / 2, hintY);
+    }
+}
+
+function updatePaused() {
+    if (inputActions.up) {
+        gameState.pauseMenuIndex = Math.max(0, gameState.pauseMenuIndex - 1);
+    }
+    if (inputActions.down) {
+        gameState.pauseMenuIndex = Math.min(2, gameState.pauseMenuIndex + 1);
+    }
+
+    // Resume on Escape/P
+    if (inputActions.pause) {
+        gameState.screen = 'playing';
+        return;
+    }
+
+    // Confirm selection
+    if (inputActions.confirm) {
+        const idx = gameState.pauseMenuIndex;
+        if (idx === 0) {
+            // Resume
+            gameState.screen = 'playing';
+        } else if (idx === 1) {
+            // Restart District
+            startDistrict(gameState.district);
+        } else if (idx === 2) {
+            // Quit to Menu
+            gameState.screen = 'title';
+        }
     }
 }
 
@@ -3128,63 +3276,151 @@ function drawCitySkyline() {
 // DRAWING - GAME OVER SCREEN
 // ============================================
 function drawGameOverScreen() {
-    // Darken
-    ctx.fillStyle = 'rgba(0,0,0,0.75)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const cw = canvas.width;
+    const ch = canvas.height;
+    const cornerR = 8;
 
-    // Headline
+    // Darken overlay
+    ctx.fillStyle = 'rgba(10,10,30,0.82)';
+    ctx.fillRect(0, 0, cw, ch);
+
+    // ── Bottom card grid (2 cards: Retry, Quit) ──
+    const pad = Math.floor(cw * 0.03);
+    const gap = Math.floor(cw * 0.025);
+    const gridW = cw - pad * 2;
+    const cardW = Math.floor((gridW - gap) / 2);
+    const cardH = Math.floor(ch * 0.13);
+    const footerH = 22;
+    const gridBottom = ch - footerH;
+    const gridTop = gridBottom - cardH;
+
+    const cardItems = [
+        { icon: '🔄', label: 'RETRY', desc: 'Try again', accent: '#ff8040', action: 'retry' },
+        { icon: '🏠', label: 'MENU', desc: 'Back to title', accent: '#4ecdc4', action: 'menu' },
+    ];
+
+    endScreenCardRects = [];
+
+    for (let i = 0; i < cardItems.length; i++) {
+        const item = cardItems[i];
+        const cx = pad + i * (cardW + gap);
+        const cy = gridTop;
+        const selected = i === (gameState._endMenuIndex || 0);
+
+        endScreenCardRects.push({ x: cx, y: cy, w: cardW, h: cardH, action: item.action, idx: i });
+
+        // Card background
+        ctx.fillStyle = selected ? `rgba(78,205,196,0.20)` : `rgba(255,255,255,0.08)`;
+        ctx.beginPath();
+        ctx.roundRect(cx, cy, cardW, cardH, cornerR);
+        ctx.fill();
+
+        // Card border
+        ctx.strokeStyle = selected ? item.accent : 'rgba(255,255,255,0.12)';
+        ctx.lineWidth = selected ? 2 : 1;
+        ctx.beginPath();
+        ctx.roundRect(cx, cy, cardW, cardH, cornerR);
+        ctx.stroke();
+
+        if (selected) {
+            ctx.shadowColor = item.accent;
+            ctx.shadowBlur = 16;
+            ctx.beginPath();
+            ctx.roundRect(cx, cy, cardW, cardH, cornerR);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        // Icon
+        const iconSize = Math.floor(cardH * 0.38);
+        ctx.font = `${iconSize}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(item.icon, cx + cardW * 0.22, cy + cardH * 0.48);
+        ctx.textBaseline = 'alphabetic';
+
+        // Label
+        ctx.fillStyle = selected ? item.accent : '#d0d8e0';
+        ctx.font = `bold ${Math.floor(cw * 0.03)}px monospace`;
+        ctx.textAlign = 'left';
+        ctx.fillText(item.label, cx + cardW * 0.40, cy + cardH * 0.42);
+
+        // Desc
+        ctx.fillStyle = selected ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.4)';
+        ctx.font = `${Math.floor(cw * 0.017)}px monospace`;
+        ctx.fillText(item.desc, cx + cardW * 0.40, cy + cardH * 0.65);
+    }
+
+    // ── Content area (above cards) ──
+    const contentBottom = gridTop - Math.floor(ch * 0.03);
+    const district = DISTRICTS[gameState.district];
     const headline = GAME_OVER_HEADLINES[Math.floor(gameState.district) % GAME_OVER_HEADLINES.length];
-
-    ctx.fillStyle = '#ff4444';
-    ctx.font = `bold ${Math.floor(canvas.width * 0.06)}px monospace`;
-    ctx.textAlign = 'center';
-    ctx.fillText('SHIFT OVER', canvas.width / 2, canvas.height * 0.25);
-
-    ctx.fillStyle = '#ff8888';
-    ctx.font = `${Math.floor(canvas.width * 0.022)}px monospace`;
-    // Word wrap the headline
-    wrapText(headline, canvas.width / 2, canvas.height * 0.35, canvas.width * 0.8, 18);
-
-    // Stats
     const pct = gameState.totalMesses > 0 ?
         Math.floor((gameState.messesClean / gameState.totalMesses) * 100) : 0;
-    ctx.fillStyle = '#aaa';
-    ctx.font = '14px monospace';
-    ctx.fillText(`Cleaned: ${pct}%  |  ${gameState.messesClean}/${gameState.totalMesses} messes`,
-                 canvas.width / 2, canvas.height * 0.50);
 
-    // Score share preview
-    drawScoreShare(canvas.width * 0.15, canvas.height * 0.55, canvas.width * 0.7, 90, 0);
+    // Title
+    ctx.fillStyle = '#ff4444';
+    ctx.font = `bold ${Math.floor(cw * 0.065)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText('SHIFT OVER', cw / 2, ch * 0.18);
 
-    // Prompt
-    const blink = Math.sin(animCache.time * 4) > 0;
-    if (blink) {
-        ctx.fillStyle = COLORS.uiAccent;
-        ctx.font = 'bold 14px monospace';
-        ctx.fillText(isMobile ? 'Tap to try again' : 'Press ENTER to try again', canvas.width / 2, canvas.height * 0.85);
-    }
+    // District name
+    ctx.fillStyle = '#ff8888';
+    ctx.font = `${Math.floor(cw * 0.025)}px monospace`;
+    ctx.fillText(district.name, cw / 2, ch * 0.25);
+
+    // Headline
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = `${Math.floor(cw * 0.018)}px monospace`;
+    wrapText(headline, cw / 2, ch * 0.32, cw * 0.8, 16);
+
+    // Stats card
+    const statsW = cw * 0.75;
+    const statsH = Math.floor(ch * 0.09);
+    const statsX = (cw - statsW) / 2;
+    const statsY = ch * 0.40;
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    ctx.beginPath();
+    ctx.roundRect(statsX, statsY, statsW, statsH, 6);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(statsX, statsY, statsW, statsH, 6);
+    ctx.stroke();
+
+    ctx.fillStyle = '#ccc';
+    ctx.font = `bold ${Math.floor(cw * 0.028)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`${pct}% CLEANED`, cw / 2, statsY + statsH * 0.42);
+    ctx.fillStyle = '#888';
+    ctx.font = `${Math.floor(cw * 0.018)}px monospace`;
+    ctx.fillText(`${gameState.messesClean} of ${gameState.totalMesses} messes`, cw / 2, statsY + statsH * 0.75);
+
+    // Score share card
+    const shareY = statsY + statsH + Math.floor(ch * 0.03);
+    const shareH = Math.floor(ch * 0.18);
+    drawScoreShare(statsX, shareY, statsW, shareH, 0);
 }
 
 // ============================================
 // DRAWING - DISTRICT COMPLETE SCREEN
 // ============================================
 function drawDistrictCompleteScreen() {
-    ctx.fillStyle = 'rgba(0,0,0,0.75)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const cw = canvas.width;
+    const ch = canvas.height;
+    const cornerR = 8;
+
+    // Darken overlay
+    ctx.fillStyle = 'rgba(10,10,30,0.82)';
+    ctx.fillRect(0, 0, cw, ch);
 
     const district = DISTRICTS[gameState.district];
     const pct = gameState.totalMesses > 0 ?
         Math.floor((gameState.messesClean / gameState.totalMesses) * 100) : 0;
-
-    // Title
-    ctx.fillStyle = COLORS.uiGold;
-    ctx.font = `bold ${Math.floor(canvas.width * 0.05)}px monospace`;
-    ctx.textAlign = 'center';
-    ctx.fillText('SHIFT COMPLETE!', canvas.width / 2, canvas.height * 0.15);
-
-    ctx.fillStyle = COLORS.uiAccent;
-    ctx.font = `${Math.floor(canvas.width * 0.025)}px monospace`;
-    ctx.fillText(`${district.name}`, canvas.width / 2, canvas.height * 0.22);
+    const nextDist = gameState.district + 1;
+    const hasNext = nextDist < DISTRICTS.length;
 
     // Stars
     let stars = 0;
@@ -3192,47 +3428,142 @@ function drawDistrictCompleteScreen() {
     if (pct >= 80) stars = 2;
     if (pct >= 100 && gameState.timeBonus > 10) stars = 3;
 
-    const starY = canvas.height * 0.32;
+    // ── Bottom card grid ──
+    const pad = Math.floor(cw * 0.03);
+    const gap = Math.floor(cw * 0.025);
+    const gridW = cw - pad * 2;
+    const cardH = Math.floor(ch * 0.13);
+    const footerH = 22;
+    const gridBottom = ch - footerH;
+    const gridTop = gridBottom - cardH;
+
+    const cardItems = hasNext
+        ? [
+            { icon: '➡️', label: 'NEXT', desc: DISTRICTS[nextDist].name, accent: '#4ecdc4', action: 'next' },
+            { icon: '🔄', label: 'REPLAY', desc: district.name, accent: '#ff8040', action: 'replay' },
+            { icon: '🏠', label: 'MENU', desc: 'Back to title', accent: '#ffe66d', action: 'menu' },
+          ]
+        : [
+            { icon: '🏠', label: 'MENU', desc: 'All complete!', accent: '#4ecdc4', action: 'menu' },
+            { icon: '🔄', label: 'REPLAY', desc: district.name, accent: '#ff8040', action: 'replay' },
+          ];
+
+    const cardW = Math.floor((gridW - gap * (cardItems.length - 1)) / cardItems.length);
+
+    endScreenCardRects = [];
+
+    for (let i = 0; i < cardItems.length; i++) {
+        const item = cardItems[i];
+        const cx = pad + i * (cardW + gap);
+        const cy = gridTop;
+        const selected = i === (gameState._endMenuIndex || 0);
+
+        endScreenCardRects.push({ x: cx, y: cy, w: cardW, h: cardH, action: item.action, idx: i });
+
+        // Card background
+        ctx.fillStyle = selected ? `rgba(78,205,196,0.20)` : `rgba(255,255,255,0.08)`;
+        ctx.beginPath();
+        ctx.roundRect(cx, cy, cardW, cardH, cornerR);
+        ctx.fill();
+
+        // Card border
+        ctx.strokeStyle = selected ? item.accent : 'rgba(255,255,255,0.12)';
+        ctx.lineWidth = selected ? 2 : 1;
+        ctx.beginPath();
+        ctx.roundRect(cx, cy, cardW, cardH, cornerR);
+        ctx.stroke();
+
+        if (selected) {
+            ctx.shadowColor = item.accent;
+            ctx.shadowBlur = 16;
+            ctx.beginPath();
+            ctx.roundRect(cx, cy, cardW, cardH, cornerR);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        // Icon
+        const iconSize = Math.floor(cardH * 0.34);
+        ctx.font = `${iconSize}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(item.icon, cx + cardW * 0.22, cy + cardH * 0.48);
+        ctx.textBaseline = 'alphabetic';
+
+        // Label
+        ctx.fillStyle = selected ? item.accent : '#d0d8e0';
+        ctx.font = `bold ${Math.floor(cw * 0.026)}px monospace`;
+        ctx.textAlign = 'left';
+        ctx.fillText(item.label, cx + cardW * 0.40, cy + cardH * 0.42);
+
+        // Desc
+        ctx.fillStyle = selected ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.4)';
+        ctx.font = `${Math.floor(cw * 0.015)}px monospace`;
+        ctx.fillText(item.desc, cx + cardW * 0.40, cy + cardH * 0.68);
+    }
+
+    // ── Content area (above cards) ──
+
+    // Title
+    ctx.fillStyle = COLORS.uiGold;
+    ctx.font = `bold ${Math.floor(cw * 0.058)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText('SHIFT COMPLETE!', cw / 2, ch * 0.13);
+
+    // District name
+    ctx.fillStyle = COLORS.uiAccent;
+    ctx.font = `${Math.floor(cw * 0.024)}px monospace`;
+    ctx.fillText(district.name, cw / 2, ch * 0.19);
+
+    // Stars
+    const starSize = Math.floor(cw * 0.065);
+    const starSpacing = Math.floor(starSize * 1.5);
+    const starsY = ch * 0.27;
     for (let i = 0; i < 3; i++) {
         const filled = i < stars;
         ctx.fillStyle = filled ? COLORS.uiGold : '#333';
-        ctx.font = `${Math.floor(canvas.width * 0.07)}px monospace`;
-        ctx.fillText(filled ? '★' : '☆', canvas.width / 2 - 60 + i * 60, starY);
-    }
-
-    // Stats
-    ctx.fillStyle = '#ccc';
-    ctx.font = '14px monospace';
-    ctx.textAlign = 'center';
-    const statsY = canvas.height * 0.45;
-    ctx.fillText(`Cleaned: ${pct}%`, canvas.width / 2, statsY);
-    ctx.fillText(`Time Bonus: +${gameState.timeBonus}s`, canvas.width / 2, statsY + 22);
-
-    // City grade
-    ctx.fillStyle = COLORS.uiAccent;
-    ctx.font = 'bold 16px monospace';
-    ctx.fillText(`City Grade: ${gameState.cityGrade}`, canvas.width / 2, statsY + 55);
-
-    ctx.fillStyle = '#aaa';
-    ctx.font = '11px monospace';
-    wrapText(getGradeHeadline(gameState.cityGrade), canvas.width / 2, statsY + 75, canvas.width * 0.8, 14);
-
-    // Score share
-    drawScoreShare(canvas.width * 0.15, canvas.height * 0.68, canvas.width * 0.7, 90, stars);
-
-    // Next prompt
-    const blink = Math.sin(animCache.time * 4) > 0;
-    if (blink) {
-        ctx.fillStyle = COLORS.uiAccent;
-        ctx.font = 'bold 14px monospace';
+        ctx.font = `${starSize}px monospace`;
         ctx.textAlign = 'center';
-        const nextDist = gameState.district + 1;
-        if (nextDist < DISTRICTS.length) {
-            ctx.fillText(isMobile ? `Tap for ${DISTRICTS[nextDist].name}` : `Press ENTER for ${DISTRICTS[nextDist].name}`, canvas.width / 2, canvas.height * 0.92);
-        } else {
-            ctx.fillText(isMobile ? 'Tap — All districts complete!' : 'Press ENTER — All districts complete!', canvas.width / 2, canvas.height * 0.92);
-        }
+        ctx.fillText(filled ? '★' : '☆', cw / 2 - starSpacing + i * starSpacing, starsY);
     }
+
+    // Stats card
+    const statsW = cw * 0.75;
+    const statsH = Math.floor(ch * 0.14);
+    const statsX = (cw - statsW) / 2;
+    const statsY = ch * 0.33;
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    ctx.beginPath();
+    ctx.roundRect(statsX, statsY, statsW, statsH, 6);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(statsX, statsY, statsW, statsH, 6);
+    ctx.stroke();
+
+    // Cleaned %
+    ctx.fillStyle = pct >= 100 ? COLORS.uiGold : '#ccc';
+    ctx.font = `bold ${Math.floor(cw * 0.032)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`${pct}% CLEANED`, cw / 2, statsY + statsH * 0.30);
+
+    // Time bonus + Grade
+    ctx.fillStyle = '#888';
+    ctx.font = `${Math.floor(cw * 0.018)}px monospace`;
+    ctx.fillText(`Time Bonus: +${gameState.timeBonus}s`, cw / 2, statsY + statsH * 0.55);
+
+    const districtGrade = calculateDistrictGrade(pct, Math.floor(gameState.timeBonus));
+    ctx.fillStyle = COLORS.uiAccent;
+    ctx.font = `bold ${Math.floor(cw * 0.022)}px monospace`;
+    ctx.fillText(`Grade: ${districtGrade}  •  City: ${gameState.cityGrade}`, cw / 2, statsY + statsH * 0.82);
+
+    // Score share card
+    const shareY = statsY + statsH + Math.floor(ch * 0.025);
+    const shareBottom = gridTop - Math.floor(ch * 0.025);
+    const shareH = Math.max(Math.floor(ch * 0.12), shareBottom - shareY);
+    drawScoreShare(statsX, shareY, statsW, shareH, stars);
 }
 
 function drawScoreShare(x, y, w, h, stars) {
@@ -3240,11 +3571,15 @@ function drawScoreShare(x, y, w, h, stars) {
     shareCardRect = { x, y, w, h };
 
     // Share card background
-    ctx.fillStyle = '#1a1a2e';
-    ctx.strokeStyle = gameState.scoreCopied ? '#4ecdc4' : '#333';
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 6);
+    ctx.fill();
+    ctx.strokeStyle = gameState.scoreCopied ? '#4ecdc4' : 'rgba(255,255,255,0.1)';
     ctx.lineWidth = gameState.scoreCopied ? 2 : 1;
-    ctx.fillRect(x, y, w, h);
-    ctx.strokeRect(x, y, w, h);
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 6);
+    ctx.stroke();
 
     const district = DISTRICTS[gameState.district];
     const pct = gameState.totalMesses > 0 ?
@@ -3672,6 +4007,13 @@ function update(dt) {
     if (gameState.screen === 'title') {
         updateTitleMenu(dt);
     } else if (gameState.screen === 'playing') {
+        // Pause takes priority
+        if (inputActions.pause) {
+            gameState.pauseMenuIndex = 0;
+            gameState.screen = 'paused';
+            return;
+        }
+
         updatePlayer(dt);
         updatePigeons(dt);
         updateHobos(dt);
@@ -3682,32 +4024,43 @@ function update(dt) {
         updateParticles(dt);
         updateCelebrations(dt);
 
-        // Check if player pressed action to finish shift (when >= 60% clean)
+        // Finish shift early (F key or action) when >= 60% clean
         const pct = gameState.totalMesses > 0 ? (gameState.messesClean / gameState.totalMesses) : 0;
-        if (pct >= 0.6 && inputActions.pause) {
+        if (pct >= 0.6 && (keys['KeyF'] || keyBuffer['KeyF'])) {
             completeDistrict();
         }
+    } else if (gameState.screen === 'paused') {
+        updatePaused();
     } else if (gameState.screen === 'gameOver') {
         updateParticles(dt);
+        if (gameState._endMenuIndex === undefined) gameState._endMenuIndex = 0;
         // C key to copy score
         if (keys['KeyC'] || keyBuffer['KeyC']) {
             shareScore();
         }
+        // Navigate cards
+        if (inputActions.left) gameState._endMenuIndex = Math.max(0, gameState._endMenuIndex - 1);
+        if (inputActions.right) gameState._endMenuIndex = Math.min(1, gameState._endMenuIndex + 1);
+        // Confirm selection
         if (inputActions.confirm) {
-            startDistrict(gameState.district);
+            executeEndScreenAction(gameState._endMenuIndex === 0 ? 'retry' : 'menu');
         }
     } else if (gameState.screen === 'districtComplete') {
+        if (gameState._endMenuIndex === undefined) gameState._endMenuIndex = 0;
         // C key to copy score
         if (keys['KeyC'] || keyBuffer['KeyC']) {
             shareScore();
         }
+        const nextDist = gameState.district + 1;
+        const hasNext = nextDist < DISTRICTS.length;
+        const maxIdx = hasNext ? 2 : 1;
+        // Navigate cards
+        if (inputActions.left) gameState._endMenuIndex = Math.max(0, gameState._endMenuIndex - 1);
+        if (inputActions.right) gameState._endMenuIndex = Math.min(maxIdx, gameState._endMenuIndex + 1);
+        // Confirm selection
         if (inputActions.confirm) {
-            const nextDist = gameState.district + 1;
-            if (nextDist < DISTRICTS.length && nextDist < gameState.districtsUnlocked) {
-                startDistrict(nextDist);
-            } else {
-                gameState.screen = 'title';
-            }
+            const rect = endScreenCardRects[gameState._endMenuIndex];
+            if (rect) executeEndScreenAction(rect.action);
         }
     } else if (gameState.screen === 'charSelect') {
         updateCharSelect(dt);
@@ -3887,8 +4240,11 @@ function draw() {
     shareCardRect = null;
     mobileBackBtnRect = null;
     mobileFinishBtnRect = null;
+    mobilePauseBtnRect = null;
     charConfirmBtnRect = null;
     titleCardRects = [];
+    pauseMenuRects = [];
+    endScreenCardRects = [];
 
     // Clear
     ctx.fillStyle = COLORS.uiBg;
@@ -3924,6 +4280,12 @@ function draw() {
     if (gameState.screen === 'playing') {
         drawGameWorld();
         drawHUD();
+    }
+
+    if (gameState.screen === 'paused') {
+        drawGameWorld();
+        drawHUD();
+        drawPauseMenu();
     }
 }
 
@@ -4146,16 +4508,25 @@ function initGame() {
             return false;
         }
 
-        // Game Over / District Complete: share card tap, or confirm
+        // Game Over / District Complete: card buttons or share card
         if (screen === 'gameOver' || screen === 'districtComplete') {
+            // Check card buttons first
+            for (const rect of endScreenCardRects) {
+                if (canvasX >= rect.x && canvasX <= rect.x + rect.w &&
+                    canvasY >= rect.y && canvasY <= rect.y + rect.h) {
+                    gameState._endMenuIndex = rect.idx;
+                    executeEndScreenAction(rect.action);
+                    return true;
+                }
+            }
+            // Share card tap
             if (shareCardRect &&
                 canvasX >= shareCardRect.x && canvasX <= shareCardRect.x + shareCardRect.w &&
                 canvasY >= shareCardRect.y && canvasY <= shareCardRect.y + shareCardRect.h) {
                 shareScore();
                 return true;
             }
-            fireKey('Space');
-            return true;
+            return false;
         }
 
         return false;
@@ -4163,14 +4534,42 @@ function initGame() {
 
     // ── Handle tap during GAMEPLAY ──
     function handlePlayTap(canvasX, canvasY) {
+        // Pause button
+        if (mobilePauseBtnRect &&
+            canvasX >= mobilePauseBtnRect.x && canvasX <= mobilePauseBtnRect.x + mobilePauseBtnRect.w &&
+            canvasY >= mobilePauseBtnRect.y && canvasY <= mobilePauseBtnRect.y + mobilePauseBtnRect.h) {
+            fireKey('Escape');
+            return true;
+        }
+        // Finish shift button
         if (mobileFinishBtnRect &&
             canvasX >= mobileFinishBtnRect.x && canvasX <= mobileFinishBtnRect.x + mobileFinishBtnRect.w &&
             canvasY >= mobileFinishBtnRect.y && canvasY <= mobileFinishBtnRect.y + mobileFinishBtnRect.h) {
-            fireKey('Escape');
+            completeDistrict();
             return true;
         }
         fireKey('Space');
         return true;
+    }
+
+    // ── Handle tap during PAUSED ──
+    function handlePauseTap(canvasX, canvasY) {
+        for (const rect of pauseMenuRects) {
+            if (canvasX >= rect.x && canvasX <= rect.x + rect.w &&
+                canvasY >= rect.y && canvasY <= rect.y + rect.h) {
+                gameState.pauseMenuIndex = rect.idx;
+                // Execute the selection
+                if (rect.idx === 0) {
+                    gameState.screen = 'playing';
+                } else if (rect.idx === 1) {
+                    startDistrict(gameState.district);
+                } else if (rect.idx === 2) {
+                    gameState.screen = 'title';
+                }
+                return true;
+            }
+        }
+        return false;
     }
 
     // ── Track the initial touch position for carousel drag detection ──
@@ -4297,11 +4696,55 @@ function initGame() {
 
             if (gameState.screen === 'playing') {
                 handlePlayTap(c.x, c.y);
+            } else if (gameState.screen === 'paused') {
+                handlePauseTap(c.x, c.y);
             } else {
                 handleMenuTap(c.x, c.y);
             }
         }
     }, { passive: false });
+
+    // ================================================================
+    // MOUSE CLICK HANDLING (for desktop pause button / pause menu)
+    // ================================================================
+    canvas.addEventListener('click', (e) => {
+        const c = clientToCanvas(e.clientX, e.clientY);
+        if (gameState.screen === 'playing') {
+            // Pause button
+            if (mobilePauseBtnRect &&
+                c.x >= mobilePauseBtnRect.x && c.x <= mobilePauseBtnRect.x + mobilePauseBtnRect.w &&
+                c.y >= mobilePauseBtnRect.y && c.y <= mobilePauseBtnRect.y + mobilePauseBtnRect.h) {
+                gameState.pauseMenuIndex = 0;
+                gameState.screen = 'paused';
+                return;
+            }
+            // Finish shift button
+            if (mobileFinishBtnRect &&
+                c.x >= mobileFinishBtnRect.x && c.x <= mobileFinishBtnRect.x + mobileFinishBtnRect.w &&
+                c.y >= mobileFinishBtnRect.y && c.y <= mobileFinishBtnRect.y + mobileFinishBtnRect.h) {
+                completeDistrict();
+                return;
+            }
+        } else if (gameState.screen === 'paused') {
+            handlePauseTap(c.x, c.y);
+        } else if (gameState.screen === 'gameOver' || gameState.screen === 'districtComplete') {
+            // End screen card buttons
+            for (const rect of endScreenCardRects) {
+                if (c.x >= rect.x && c.x <= rect.x + rect.w &&
+                    c.y >= rect.y && c.y <= rect.y + rect.h) {
+                    gameState._endMenuIndex = rect.idx;
+                    executeEndScreenAction(rect.action);
+                    return;
+                }
+            }
+            // Share card click
+            if (shareCardRect &&
+                c.x >= shareCardRect.x && c.x <= shareCardRect.x + shareCardRect.w &&
+                c.y >= shareCardRect.y && c.y <= shareCardRect.y + shareCardRect.h) {
+                shareScore();
+            }
+        }
+    });
 
     // Load saved progress
     loadProgress();
