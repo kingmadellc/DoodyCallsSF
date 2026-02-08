@@ -563,6 +563,7 @@ wordmarkImg.src = 'assets/wordmark.png?v=2';
 let gameState = {
     // Core
     screen: 'title',  // title, playing, paused, gameOver, districtComplete, charSelect, districtSelect
+    gameMode: 'normal',  // normal, daily
     district: 0,       // Index into DISTRICTS array
     timer: 60,
     started: false,
@@ -625,6 +626,7 @@ let gameState = {
     // Daily district
     dailyPlayed: false,
     dailySeed: 0,
+    dailyResult: null,  // { pct, timeLeft, stars, grade, districtName, charName, scoreText }
 
     // News ticker
     tickerOffset: 0,
@@ -1876,8 +1878,15 @@ function fallbackCopy(text) {
 // DAILY DISTRICT
 // ============================================
 function getDailySeed() {
-    const d = new Date();
-    return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+    // Daily resets at 5:00 AM PST (13:00 UTC)
+    const now = new Date();
+    const utcH = now.getUTCHours();
+    const utcD = new Date(now);
+    // If before 13:00 UTC (5 AM PST), use yesterday's date
+    if (utcH < 13) {
+        utcD.setUTCDate(utcD.getUTCDate() - 1);
+    }
+    return utcD.getUTCFullYear() * 10000 + (utcD.getUTCMonth() + 1) * 100 + utcD.getUTCDate();
 }
 
 function getDailyDistrictIndex() {
@@ -1932,6 +1941,13 @@ function updateTimer(dt) {
         // Generate score text for sharing
         gameState.lastScoreText = generateScoreText(0);
         gameState.scoreCopied = false;
+        // Save daily result if this was a daily district
+        const pctGO = gameState.totalMesses > 0 ?
+            Math.floor((gameState.messesClean / gameState.totalMesses) * 100) : 0;
+        if (gameState.gameMode === 'daily') {
+            saveDailyResult(pctGO, 0, 0);
+        }
+        gameState.gameMode = 'normal';
     }
 }
 
@@ -2087,6 +2103,27 @@ function completeDistrict() {
     gameState.lastScoreText = generateScoreText(stars);
     gameState.scoreCopied = false;
 
+    // Save daily result if this was a daily district
+    if (gameState.gameMode === 'daily') {
+        saveDailyResult(pctInt, Math.floor(timeLeft), stars);
+    }
+    gameState.gameMode = 'normal';
+
+    saveProgress();
+}
+
+function saveDailyResult(pct, timeLeft, stars) {
+    const district = DISTRICTS[gameState.district];
+    const char = CHARACTERS[gameState.selectedCharacter];
+    const grade = calculateDistrictGrade(pct, timeLeft);
+    gameState.dailyResult = {
+        pct, timeLeft, stars, grade,
+        districtName: district.name,
+        charName: char.name,
+        scoreText: gameState.lastScoreText,
+        clutch: gameState.clutchFinish,
+        nearMiss: gameState.nearMiss,
+    };
     saveProgress();
 }
 
@@ -3385,12 +3422,93 @@ function drawGameOverScreen() {
     const cw = canvas.width;
     const ch = canvas.height;
     const cornerR = 8;
+    const t = animCache.time;
 
-    // Darken overlay
-    ctx.fillStyle = 'rgba(10,10,30,0.82)';
+    // Darken overlay with red tint
+    ctx.fillStyle = 'rgba(10,5,5,0.88)';
     ctx.fillRect(0, 0, cw, ch);
 
-    // ── Bottom card grid ──
+    // Subtle red vignette at top
+    const vigGrad = ctx.createRadialGradient(cw / 2, 0, 0, cw / 2, 0, cw * 0.8);
+    vigGrad.addColorStop(0, 'rgba(255,40,40,0.08)');
+    vigGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = vigGrad;
+    ctx.fillRect(0, 0, cw, ch * 0.5);
+
+    const district = DISTRICTS[gameState.district];
+    const pct = gameState.totalMesses > 0 ?
+        Math.floor((gameState.messesClean / gameState.totalMesses) * 100) : 0;
+    const headline = GAME_OVER_HEADLINES[Math.floor(gameState.district) % GAME_OVER_HEADLINES.length];
+
+    // ── HEADER: "TIME'S UP" with pulsing alarm ──
+    const pulseAlpha = 0.7 + Math.sin(t * 4) * 0.3;
+    ctx.fillStyle = `rgba(255,68,68,${pulseAlpha})`;
+    ctx.font = `bold ${Math.floor(cw * 0.065)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText("\u23F0 TIME'S UP", cw / 2, ch * 0.10);
+
+    // District name
+    ctx.fillStyle = '#ff8888';
+    ctx.font = `${Math.floor(cw * 0.020)}px monospace`;
+    ctx.fillText(district.name, cw / 2, ch * 0.15);
+
+    // ── HERO: Big percentage with progress ring ──
+    const ringCX = cw / 2;
+    const ringCY = ch * 0.29;
+    const ringR = Math.floor(cw * 0.10);
+    const ringW = 6;
+
+    // Background ring
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = ringW;
+    ctx.beginPath();
+    ctx.arc(ringCX, ringCY, ringR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Progress ring
+    const pctFrac = pct / 100;
+    const ringColor = pct >= 60 ? '#4ecdc4' : pct >= 30 ? '#ff8040' : '#ff4444';
+    ctx.strokeStyle = ringColor;
+    ctx.lineWidth = ringW;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(ringCX, ringCY, ringR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pctFrac);
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+
+    // Percentage number inside ring
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${Math.floor(cw * 0.055)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${pct}%`, ringCX, ringCY - 2);
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#888';
+    ctx.font = `${Math.floor(cw * 0.014)}px monospace`;
+    ctx.fillText(`${gameState.messesClean}/${gameState.totalMesses}`, ringCX, ringCY + ringR * 0.55);
+
+    // ── HEADLINE: Funny failure news ──
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.font = `italic ${Math.floor(cw * 0.014)}px monospace`;
+    ctx.textAlign = 'center';
+    wrapText(headline, cw / 2, ch * 0.44, cw * 0.85, 14);
+
+    // ── SHARE CARD ──
+    const shareW = cw * 0.80;
+    const shareX = (cw - shareW) / 2;
+    const shareY = ch * 0.50;
+    const shareH = Math.floor(ch * 0.12);
+    drawScoreShare(shareX, shareY, shareW, shareH, 0);
+
+    // ── HOBO QUOTE ──
+    const quoteY = shareY + shareH + Math.floor(ch * 0.012);
+    const btnTop = ch - 22 - Math.floor(ch * 0.13);
+    const quoteH = btnTop - quoteY - Math.floor(ch * 0.012);
+    if (quoteH > 30) {
+        drawHoboQuote(shareX, quoteY, shareW, quoteH);
+    }
+
+    // ── BOTTOM BUTTONS ──
     const pad = Math.floor(cw * 0.03);
     const gap = Math.floor(cw * 0.025);
     const gridW = cw - pad * 2;
@@ -3400,123 +3518,12 @@ function drawGameOverScreen() {
     const gridTop = gridBottom - cardH;
 
     const cardItems = [
-        { icon: '🔄', label: 'RETRY', desc: 'Try again', accent: '#ff8040', action: 'retry' },
-        { icon: '➡️', label: 'NEXT', desc: 'Random district', accent: '#4ecdc4', action: 'next' },
-        { icon: '🏠', label: 'MENU', desc: 'Back to title', accent: '#ffe66d', action: 'menu' },
+        { icon: '\u{1F504}', label: 'RETRY', desc: 'Try again', accent: '#ff8040', action: 'retry' },
+        { icon: '\u27A1\uFE0F', label: 'NEXT', desc: 'Random district', accent: '#4ecdc4', action: 'next' },
+        { icon: '\u{1F3E0}', label: 'MENU', desc: 'Back to title', accent: '#ffe66d', action: 'menu' },
     ];
 
-    const cardW = Math.floor((gridW - gap * (cardItems.length - 1)) / cardItems.length);
-
-    endScreenCardRects = [];
-
-    for (let i = 0; i < cardItems.length; i++) {
-        const item = cardItems[i];
-        const cx = pad + i * (cardW + gap);
-        const cy = gridTop;
-        const selected = i === (gameState._endMenuIndex || 0);
-
-        endScreenCardRects.push({ x: cx, y: cy, w: cardW, h: cardH, action: item.action, idx: i });
-
-        // Card background
-        ctx.fillStyle = selected ? `rgba(78,205,196,0.20)` : `rgba(255,255,255,0.08)`;
-        ctx.beginPath();
-        ctx.roundRect(cx, cy, cardW, cardH, cornerR);
-        ctx.fill();
-
-        // Card border
-        ctx.strokeStyle = selected ? item.accent : 'rgba(255,255,255,0.12)';
-        ctx.lineWidth = selected ? 2 : 1;
-        ctx.beginPath();
-        ctx.roundRect(cx, cy, cardW, cardH, cornerR);
-        ctx.stroke();
-
-        if (selected) {
-            ctx.shadowColor = item.accent;
-            ctx.shadowBlur = 16;
-            ctx.beginPath();
-            ctx.roundRect(cx, cy, cardW, cardH, cornerR);
-            ctx.stroke();
-            ctx.shadowBlur = 0;
-        }
-
-        // Icon
-        const iconSize = Math.floor(cardH * 0.38);
-        ctx.font = `${iconSize}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(item.icon, cx + cardW * 0.22, cy + cardH * 0.48);
-        ctx.textBaseline = 'alphabetic';
-
-        // Label
-        ctx.fillStyle = selected ? item.accent : '#d0d8e0';
-        ctx.font = `bold ${Math.floor(cw * 0.03)}px monospace`;
-        ctx.textAlign = 'left';
-        ctx.fillText(item.label, cx + cardW * 0.40, cy + cardH * 0.42);
-
-        // Desc
-        ctx.fillStyle = selected ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.4)';
-        ctx.font = `${Math.floor(cw * 0.017)}px monospace`;
-        ctx.fillText(item.desc, cx + cardW * 0.40, cy + cardH * 0.65);
-    }
-
-    // ── Content area (above cards) ──
-    const contentBottom = gridTop - Math.floor(ch * 0.03);
-    const district = DISTRICTS[gameState.district];
-    const headline = GAME_OVER_HEADLINES[Math.floor(gameState.district) % GAME_OVER_HEADLINES.length];
-    const pct = gameState.totalMesses > 0 ?
-        Math.floor((gameState.messesClean / gameState.totalMesses) * 100) : 0;
-
-    // Title
-    ctx.fillStyle = '#ff4444';
-    ctx.font = `bold ${Math.floor(cw * 0.055)}px monospace`;
-    ctx.textAlign = 'center';
-    ctx.fillText('SHIFT OVER', cw / 2, ch * 0.14);
-
-    // District name
-    ctx.fillStyle = '#ff8888';
-    ctx.font = `${Math.floor(cw * 0.022)}px monospace`;
-    ctx.fillText(district.name, cw / 2, ch * 0.20);
-
-    // Headline
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.font = `${Math.floor(cw * 0.016)}px monospace`;
-    wrapText(headline, cw / 2, ch * 0.26, cw * 0.8, 14);
-
-    // Stats card
-    const statsW = cw * 0.80;
-    const statsH = Math.floor(ch * 0.07);
-    const statsX = (cw - statsW) / 2;
-    const statsY = ch * 0.32;
-    ctx.fillStyle = 'rgba(255,255,255,0.05)';
-    ctx.beginPath();
-    ctx.roundRect(statsX, statsY, statsW, statsH, 6);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(statsX, statsY, statsW, statsH, 6);
-    ctx.stroke();
-
-    ctx.fillStyle = '#ccc';
-    ctx.font = `bold ${Math.floor(cw * 0.026)}px monospace`;
-    ctx.textAlign = 'center';
-    ctx.fillText(`${pct}% CLEANED`, cw / 2, statsY + statsH * 0.45);
-    ctx.fillStyle = '#888';
-    ctx.font = `${Math.floor(cw * 0.016)}px monospace`;
-    ctx.fillText(`${gameState.messesClean} of ${gameState.totalMesses} messes`, cw / 2, statsY + statsH * 0.80);
-
-    // Score share card
-    const shareY = statsY + statsH + Math.floor(ch * 0.015);
-    const shareH = Math.floor(ch * 0.12);
-    drawScoreShare(statsX, shareY, statsW, shareH, 0);
-
-    // Hobo wisdom quote
-    const quoteY = shareY + shareH + Math.floor(ch * 0.015);
-    const quoteH = gridTop - quoteY - Math.floor(ch * 0.015);
-    if (quoteH > 20) {
-        drawHoboQuote(statsX, quoteY, statsW, quoteH);
-    }
+    drawEndScreenButtons(cardItems, pad, gap, gridW, cardH, gridTop, cornerR, cw);
 }
 
 // ============================================
@@ -3526,22 +3533,142 @@ function drawDistrictCompleteScreen() {
     const cw = canvas.width;
     const ch = canvas.height;
     const cornerR = 8;
+    const t = animCache.time;
 
-    // Darken overlay
-    ctx.fillStyle = 'rgba(10,10,30,0.82)';
+    // Darken overlay with golden tint
+    ctx.fillStyle = 'rgba(10,10,20,0.85)';
     ctx.fillRect(0, 0, cw, ch);
+
+    // Celebration glow
+    const glowGrad = ctx.createRadialGradient(cw / 2, ch * 0.22, 0, cw / 2, ch * 0.22, cw * 0.5);
+    glowGrad.addColorStop(0, 'rgba(255,220,100,0.06)');
+    glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = glowGrad;
+    ctx.fillRect(0, 0, cw, ch * 0.5);
 
     const district = DISTRICTS[gameState.district];
     const pct = gameState.totalMesses > 0 ?
         Math.floor((gameState.messesClean / gameState.totalMesses) * 100) : 0;
 
-    // Stars
     let stars = 0;
     if (pct >= 60) stars = 1;
     if (pct >= 80) stars = 2;
     if (pct >= 100 && gameState.timeBonus > 10) stars = 3;
 
-    // ── Bottom card grid ──
+    // ── HEADER ──
+    ctx.fillStyle = COLORS.uiGold;
+    ctx.font = `bold ${Math.floor(cw * 0.055)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText('SHIFT COMPLETE!', cw / 2, ch * 0.10);
+
+    ctx.fillStyle = COLORS.uiAccent;
+    ctx.font = `${Math.floor(cw * 0.020)}px monospace`;
+    ctx.fillText(district.name, cw / 2, ch * 0.15);
+
+    // ── STARS with bounce animation ──
+    const starSize = Math.floor(cw * 0.07);
+    const starSpacing = Math.floor(starSize * 1.6);
+    const starsBaseY = ch * 0.22;
+    for (let i = 0; i < 3; i++) {
+        const filled = i < stars;
+        const bounce = filled ? Math.sin(t * 3 + i * 0.8) * 3 : 0;
+        ctx.fillStyle = filled ? COLORS.uiGold : 'rgba(255,255,255,0.12)';
+        ctx.font = `${starSize}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText(filled ? '\u2605' : '\u2606', cw / 2 - starSpacing + i * starSpacing, starsBaseY + bounce);
+    }
+
+    // ── HERO: Progress ring + percentage ──
+    const ringCX = cw / 2;
+    const ringCY = ch * 0.36;
+    const ringR = Math.floor(cw * 0.09);
+    const ringW = 6;
+
+    // Background ring
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = ringW;
+    ctx.beginPath();
+    ctx.arc(ringCX, ringCY, ringR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Progress ring
+    const pctFrac = pct / 100;
+    const ringColor = pct >= 100 ? COLORS.uiGold : pct >= 80 ? COLORS.uiAccent : pct >= 60 ? '#ff8040' : '#ff4444';
+    ctx.strokeStyle = ringColor;
+    ctx.lineWidth = ringW;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(ringCX, ringCY, ringR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pctFrac);
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+
+    // Percentage inside
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${Math.floor(cw * 0.048)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${pct}%`, ringCX, ringCY - 2);
+    ctx.textBaseline = 'alphabetic';
+
+    // Stats row below ring
+    const rowY = ringCY + ringR + Math.floor(ch * 0.04);
+    ctx.font = `${Math.floor(cw * 0.016)}px monospace`;
+    ctx.textAlign = 'center';
+
+    // Grade
+    const districtGrade = calculateDistrictGrade(pct, Math.floor(gameState.timeBonus));
+    ctx.fillStyle = COLORS.uiAccent;
+    ctx.font = `bold ${Math.floor(cw * 0.028)}px monospace`;
+    ctx.fillText(districtGrade, cw / 2 - cw * 0.18, rowY);
+    ctx.fillStyle = '#555';
+    ctx.font = `${Math.floor(cw * 0.012)}px monospace`;
+    ctx.fillText('GRADE', cw / 2 - cw * 0.18, rowY + 14);
+
+    // Time left
+    ctx.fillStyle = '#ccc';
+    ctx.font = `bold ${Math.floor(cw * 0.028)}px monospace`;
+    ctx.fillText(`${gameState.timeBonus}s`, cw / 2, rowY);
+    ctx.fillStyle = '#555';
+    ctx.font = `${Math.floor(cw * 0.012)}px monospace`;
+    ctx.fillText('TIME LEFT', cw / 2, rowY + 14);
+
+    // City grade
+    ctx.fillStyle = COLORS.uiGold;
+    ctx.font = `bold ${Math.floor(cw * 0.028)}px monospace`;
+    ctx.fillText(gameState.cityGrade, cw / 2 + cw * 0.18, rowY);
+    ctx.fillStyle = '#555';
+    ctx.font = `${Math.floor(cw * 0.012)}px monospace`;
+    ctx.fillText('CITY', cw / 2 + cw * 0.18, rowY + 14);
+
+    // Clutch / near miss
+    if (gameState.clutchFinish) {
+        ctx.fillStyle = '#ffdd44';
+        ctx.font = `bold ${Math.floor(cw * 0.016)}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('\u26A1 CLUTCH FINISH!', cw / 2, rowY + 30);
+    } else if (gameState.nearMiss) {
+        ctx.fillStyle = '#ff8888';
+        ctx.font = `bold ${Math.floor(cw * 0.016)}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('SO CLOSE...', cw / 2, rowY + 30);
+    }
+
+    // ── SHARE CARD ──
+    const shareW = cw * 0.80;
+    const shareX = (cw - shareW) / 2;
+    const shareY = rowY + 42;
+    const shareH = Math.floor(ch * 0.11);
+    drawScoreShare(shareX, shareY, shareW, shareH, stars);
+
+    // ── HOBO QUOTE ──
+    const btnTop = ch - 22 - Math.floor(ch * 0.13);
+    const quoteY = shareY + shareH + Math.floor(ch * 0.010);
+    const quoteH = btnTop - quoteY - Math.floor(ch * 0.010);
+    if (quoteH > 30) {
+        drawHoboQuote(shareX, quoteY, shareW, quoteH);
+    }
+
+    // ── BOTTOM BUTTONS ──
     const pad = Math.floor(cw * 0.03);
     const gap = Math.floor(cw * 0.025);
     const gridW = cw - pad * 2;
@@ -3551,13 +3678,16 @@ function drawDistrictCompleteScreen() {
     const gridTop = gridBottom - cardH;
 
     const cardItems = [
-        { icon: '➡️', label: 'NEXT', desc: 'Random district', accent: '#4ecdc4', action: 'next' },
-        { icon: '🔄', label: 'REPLAY', desc: district.name, accent: '#ff8040', action: 'replay' },
-        { icon: '🏠', label: 'MENU', desc: 'Back to title', accent: '#ffe66d', action: 'menu' },
+        { icon: '\u27A1\uFE0F', label: 'NEXT', desc: 'Random district', accent: '#4ecdc4', action: 'next' },
+        { icon: '\u{1F504}', label: 'REPLAY', desc: district.name, accent: '#ff8040', action: 'replay' },
+        { icon: '\u{1F3E0}', label: 'MENU', desc: 'Back to title', accent: '#ffe66d', action: 'menu' },
     ];
 
-    const cardW = Math.floor((gridW - gap * (cardItems.length - 1)) / cardItems.length);
+    drawEndScreenButtons(cardItems, pad, gap, gridW, cardH, gridTop, cornerR, cw);
+}
 
+function drawEndScreenButtons(cardItems, pad, gap, gridW, cardH, gridTop, cornerR, cw) {
+    const cardW = Math.floor((gridW - gap * (cardItems.length - 1)) / cardItems.length);
     endScreenCardRects = [];
 
     for (let i = 0; i < cardItems.length; i++) {
@@ -3591,7 +3721,7 @@ function drawDistrictCompleteScreen() {
         }
 
         // Icon
-        const iconSize = Math.floor(cardH * 0.34);
+        const iconSize = Math.floor(cardH * 0.36);
         ctx.font = `${iconSize}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -3601,82 +3731,14 @@ function drawDistrictCompleteScreen() {
 
         // Label
         ctx.fillStyle = selected ? item.accent : '#d0d8e0';
-        ctx.font = `bold ${Math.floor(cw * 0.026)}px monospace`;
+        ctx.font = `bold ${Math.floor(cw * 0.028)}px monospace`;
         ctx.textAlign = 'left';
         ctx.fillText(item.label, cx + cardW * 0.40, cy + cardH * 0.42);
 
         // Desc
         ctx.fillStyle = selected ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.4)';
         ctx.font = `${Math.floor(cw * 0.015)}px monospace`;
-        ctx.fillText(item.desc, cx + cardW * 0.40, cy + cardH * 0.68);
-    }
-
-    // ── Content area (above cards) ──
-
-    // Title
-    ctx.fillStyle = COLORS.uiGold;
-    ctx.font = `bold ${Math.floor(cw * 0.058)}px monospace`;
-    ctx.textAlign = 'center';
-    ctx.fillText('SHIFT COMPLETE!', cw / 2, ch * 0.13);
-
-    // District name
-    ctx.fillStyle = COLORS.uiAccent;
-    ctx.font = `${Math.floor(cw * 0.024)}px monospace`;
-    ctx.fillText(district.name, cw / 2, ch * 0.19);
-
-    // Stars
-    const starSize = Math.floor(cw * 0.065);
-    const starSpacing = Math.floor(starSize * 1.5);
-    const starsY = ch * 0.27;
-    for (let i = 0; i < 3; i++) {
-        const filled = i < stars;
-        ctx.fillStyle = filled ? COLORS.uiGold : '#333';
-        ctx.font = `${starSize}px monospace`;
-        ctx.textAlign = 'center';
-        ctx.fillText(filled ? '★' : '☆', cw / 2 - starSpacing + i * starSpacing, starsY);
-    }
-
-    // Stats card
-    const statsW = cw * 0.75;
-    const statsH = Math.floor(ch * 0.14);
-    const statsX = (cw - statsW) / 2;
-    const statsY = ch * 0.33;
-    ctx.fillStyle = 'rgba(255,255,255,0.05)';
-    ctx.beginPath();
-    ctx.roundRect(statsX, statsY, statsW, statsH, 6);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(statsX, statsY, statsW, statsH, 6);
-    ctx.stroke();
-
-    // Cleaned %
-    ctx.fillStyle = pct >= 100 ? COLORS.uiGold : '#ccc';
-    ctx.font = `bold ${Math.floor(cw * 0.032)}px monospace`;
-    ctx.textAlign = 'center';
-    ctx.fillText(`${pct}% CLEANED`, cw / 2, statsY + statsH * 0.30);
-
-    // Time bonus + Grade
-    ctx.fillStyle = '#888';
-    ctx.font = `${Math.floor(cw * 0.018)}px monospace`;
-    ctx.fillText(`Time Bonus: +${gameState.timeBonus}s`, cw / 2, statsY + statsH * 0.55);
-
-    const districtGrade = calculateDistrictGrade(pct, Math.floor(gameState.timeBonus));
-    ctx.fillStyle = COLORS.uiAccent;
-    ctx.font = `bold ${Math.floor(cw * 0.022)}px monospace`;
-    ctx.fillText(`Grade: ${districtGrade}  •  City: ${gameState.cityGrade}`, cw / 2, statsY + statsH * 0.82);
-
-    // Score share card
-    const shareY = statsY + statsH + Math.floor(ch * 0.02);
-    const shareH = Math.floor(ch * 0.12);
-    drawScoreShare(statsX, shareY, statsW, shareH, stars);
-
-    // Hobo wisdom quote
-    const quoteY = shareY + shareH + Math.floor(ch * 0.015);
-    const quoteH = gridTop - quoteY - Math.floor(ch * 0.015);
-    if (quoteH > 20) {
-        drawHoboQuote(statsX, quoteY, statsW, quoteH);
+        ctx.fillText(item.desc, cx + cardW * 0.40, cy + cardH * 0.65);
     }
 }
 
@@ -3783,6 +3845,169 @@ function drawScoreShare(x, y, w, h, stars) {
         ctx.fillStyle = '#ff8888';
         ctx.fillText('SO CLOSE...', x + 8, y + 72);
     }
+}
+
+// ============================================
+// DRAWING - DAILY RESULT SCREEN (replay scorecard)
+// ============================================
+function drawDailyResultScreen() {
+    const cw = canvas.width;
+    const ch = canvas.height;
+    const r = gameState.dailyResult;
+
+    // Background
+    ctx.fillStyle = COLORS.uiBg;
+    ctx.fillRect(0, 0, cw, ch);
+
+    // Subtle gradient overlay
+    const grad = ctx.createLinearGradient(0, 0, 0, ch);
+    grad.addColorStop(0, 'rgba(255,107,157,0.08)');
+    grad.addColorStop(1, 'rgba(78,205,196,0.05)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, cw, ch);
+
+    const dailyDist = DISTRICTS[getDailyDistrictIndex()];
+
+    // Header
+    ctx.fillStyle = '#ff6b9d';
+    ctx.font = `bold ${Math.floor(cw * 0.05)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText('\u{1F4C5} DAILY DISTRICT', cw / 2, ch * 0.12);
+
+    ctx.fillStyle = COLORS.uiAccent;
+    ctx.font = `${Math.floor(cw * 0.024)}px monospace`;
+    ctx.fillText(dailyDist.name, cw / 2, ch * 0.18);
+
+    if (!r) {
+        // No result saved (shouldn't happen, but graceful fallback)
+        ctx.fillStyle = '#888';
+        ctx.font = `${Math.floor(cw * 0.022)}px monospace`;
+        ctx.fillText('Already completed today!', cw / 2, ch * 0.35);
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.font = `${Math.floor(cw * 0.018)}px monospace`;
+        ctx.fillText('New daily unlocks at 5:00 AM PST', cw / 2, ch * 0.42);
+        ctx.fillText('Tap or press any key to go back', cw / 2, ch * 0.88);
+        return;
+    }
+
+    // "COMPLETED" badge
+    ctx.fillStyle = 'rgba(78,205,196,0.12)';
+    ctx.beginPath();
+    ctx.roundRect(cw * 0.25, ch * 0.22, cw * 0.5, ch * 0.05, 20);
+    ctx.fill();
+    ctx.fillStyle = COLORS.uiAccent;
+    ctx.font = `bold ${Math.floor(cw * 0.018)}px monospace`;
+    ctx.fillText('\u2705 COMPLETED', cw / 2, ch * 0.255);
+
+    // Stars
+    const starSize = Math.floor(cw * 0.07);
+    const starSpacing = Math.floor(starSize * 1.5);
+    const starsY = ch * 0.34;
+    for (let i = 0; i < 3; i++) {
+        const filled = i < r.stars;
+        ctx.fillStyle = filled ? COLORS.uiGold : '#333';
+        ctx.font = `${starSize}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText(filled ? '\u2605' : '\u2606', cw / 2 - starSpacing + i * starSpacing, starsY);
+    }
+
+    // Stats card
+    const statsW = cw * 0.80;
+    const statsH = Math.floor(ch * 0.22);
+    const statsX = (cw - statsW) / 2;
+    const statsY = ch * 0.40;
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    ctx.beginPath();
+    ctx.roundRect(statsX, statsY, statsW, statsH, 8);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(statsX, statsY, statsW, statsH, 8);
+    ctx.stroke();
+
+    // Cleaned %
+    const pctColor = r.pct >= 100 ? COLORS.uiGold : r.pct >= 60 ? COLORS.uiAccent : '#ff6b6b';
+    ctx.fillStyle = pctColor;
+    ctx.font = `bold ${Math.floor(cw * 0.055)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`${r.pct}%`, cw / 2, statsY + statsH * 0.28);
+    ctx.fillStyle = '#888';
+    ctx.font = `${Math.floor(cw * 0.018)}px monospace`;
+    ctx.fillText('CLEANED', cw / 2, statsY + statsH * 0.40);
+
+    // Divider
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.beginPath();
+    ctx.moveTo(statsX + 20, statsY + statsH * 0.48);
+    ctx.lineTo(statsX + statsW - 20, statsY + statsH * 0.48);
+    ctx.stroke();
+
+    // Stats row
+    ctx.font = `${Math.floor(cw * 0.017)}px monospace`;
+    ctx.textAlign = 'center';
+
+    // Grade
+    ctx.fillStyle = COLORS.uiAccent;
+    ctx.font = `bold ${Math.floor(cw * 0.03)}px monospace`;
+    ctx.fillText(r.grade, cw / 2 - cw * 0.18, statsY + statsH * 0.65);
+    ctx.fillStyle = '#666';
+    ctx.font = `${Math.floor(cw * 0.013)}px monospace`;
+    ctx.fillText('GRADE', cw / 2 - cw * 0.18, statsY + statsH * 0.75);
+
+    // Time
+    ctx.fillStyle = '#ccc';
+    ctx.font = `bold ${Math.floor(cw * 0.03)}px monospace`;
+    ctx.fillText(`${r.timeLeft}s`, cw / 2, statsY + statsH * 0.65);
+    ctx.fillStyle = '#666';
+    ctx.font = `${Math.floor(cw * 0.013)}px monospace`;
+    ctx.fillText('TIME LEFT', cw / 2, statsY + statsH * 0.75);
+
+    // Character
+    ctx.fillStyle = '#ccc';
+    ctx.font = `bold ${Math.floor(cw * 0.018)}px monospace`;
+    ctx.fillText(r.charName, cw / 2 + cw * 0.18, statsY + statsH * 0.65);
+    ctx.fillStyle = '#666';
+    ctx.font = `${Math.floor(cw * 0.013)}px monospace`;
+    ctx.fillText('WORKER', cw / 2 + cw * 0.18, statsY + statsH * 0.75);
+
+    // Clutch / near miss badge
+    if (r.clutch) {
+        ctx.fillStyle = '#ffdd44';
+        ctx.font = `bold ${Math.floor(cw * 0.016)}px monospace`;
+        ctx.fillText('\u26A1 CLUTCH FINISH!', cw / 2, statsY + statsH * 0.90);
+    } else if (r.nearMiss) {
+        ctx.fillStyle = '#ff8888';
+        ctx.font = `bold ${Math.floor(cw * 0.016)}px monospace`;
+        ctx.fillText('SO CLOSE...', cw / 2, statsY + statsH * 0.90);
+    }
+
+    // Next daily countdown
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.font = `${Math.floor(cw * 0.016)}px monospace`;
+    ctx.textAlign = 'center';
+    const nextReset = getNextDailyReset();
+    ctx.fillText(`New daily in ${nextReset}`, cw / 2, ch * 0.72);
+
+    // Back hint
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.font = `${Math.floor(cw * 0.015)}px monospace`;
+    ctx.fillText(isMobile ? 'Tap anywhere to go back' : 'Press any key to go back', cw / 2, ch * 0.92);
+}
+
+function getNextDailyReset() {
+    const now = new Date();
+    // Next reset is 13:00 UTC (5 AM PST)
+    const reset = new Date(now);
+    reset.setUTCHours(13, 0, 0, 0);
+    if (now >= reset) {
+        reset.setUTCDate(reset.getUTCDate() + 1);
+    }
+    const diff = reset - now;
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
 }
 
 // ============================================
@@ -4226,6 +4451,11 @@ function update(dt) {
             const rect = endScreenCardRects[gameState._endMenuIndex];
             if (rect) executeEndScreenAction(rect.action);
         }
+    } else if (gameState.screen === 'dailyResult') {
+        // Any key returns to title
+        if (inputActions.confirm || inputActions.pause) {
+            gameState.screen = 'title';
+        }
     } else if (gameState.screen === 'charSelect') {
         updateCharSelect(dt);
     } else if (gameState.screen === 'districtSelect') {
@@ -4258,7 +4488,8 @@ function titleMenuSelect(idx) {
     } else if (idx === 3) {
         // Daily District — only once per day unless admin
         if (gameState.dailyPlayed && !IS_ADMIN) {
-            return; // Already played today
+            gameState.screen = 'dailyResult';
+            return;
         }
         const dailyIdx = getDailyDistrictIndex();
         gameState._pendingMode = 'daily';
@@ -4307,6 +4538,7 @@ function charSelectConfirm() {
         const idx = Math.floor(Math.random() * DISTRICTS.length);
         startDistrict(idx);
     } else if (mode === 'daily') {
+        gameState.gameMode = 'daily';
         gameState.dailyPlayed = true;
         gameState.dailySeed = getDailySeed();
         saveProgress();
@@ -4433,6 +4665,11 @@ function draw() {
 
     if (gameState.screen === 'districtSelect') {
         drawDistrictSelectScreen();
+        return;
+    }
+
+    if (gameState.screen === 'dailyResult') {
+        drawDailyResultScreen();
         return;
     }
 
@@ -4716,6 +4953,12 @@ function initGame() {
             return false;
         }
 
+        // Daily Result: tap anywhere to go back
+        if (screen === 'dailyResult') {
+            gameState.screen = 'title';
+            return true;
+        }
+
         // Game Over / District Complete: card buttons or share card
         if (screen === 'gameOver' || screen === 'districtComplete') {
             // Check card buttons first
@@ -4944,6 +5187,9 @@ function initGame() {
             }
         } else if (gameState.screen === 'paused') {
             handlePauseTap(c.x, c.y);
+        } else if (gameState.screen === 'dailyResult') {
+            gameState.screen = 'title';
+            return;
         } else if (gameState.screen === 'gameOver' || gameState.screen === 'districtComplete') {
             // End screen card buttons
             for (const rect of endScreenCardRects) {
@@ -4997,9 +5243,11 @@ function loadProgress() {
             if (data.dailySeed === todaySeed) {
                 gameState.dailyPlayed = data.dailyPlayed || false;
                 gameState.dailySeed = todaySeed;
+                gameState.dailyResult = data.dailyResult || null;
             } else {
                 gameState.dailyPlayed = false;
                 gameState.dailySeed = todaySeed;
+                gameState.dailyResult = null;
             }
         }
     } catch (e) {
@@ -5018,6 +5266,7 @@ function saveProgress() {
             selectedCharacter: gameState.selectedCharacter,
             dailyPlayed: gameState.dailyPlayed,
             dailySeed: gameState.dailySeed,
+            dailyResult: gameState.dailyResult,
         }));
     } catch (e) {
         debugLog('Failed to save progress:', e);
