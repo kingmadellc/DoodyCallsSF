@@ -2875,34 +2875,6 @@ function drawTitleScreen() {
     ctx.fillStyle = darkGrad;
     ctx.fillRect(0, darkStart - ch * 0.12, cw, ch - darkStart + ch * 0.12);
 
-    // ── Layer 8: Wordmark logo ──
-    if (wordmarkImg.complete && wordmarkImg.naturalWidth > 0) {
-        const logoW = cw * 0.52;
-        const logoH = logoW * (wordmarkImg.naturalHeight / wordmarkImg.naturalWidth);
-        const logoX = (cw - logoW) / 2;
-        const logoY = ch * 0.015;
-        ctx.drawImage(wordmarkImg, logoX, logoY, logoW, logoH);
-
-        ctx.globalAlpha = 0.85;
-        ctx.fillStyle = '#4ecdc4';
-        ctx.font = `${Math.floor(cw * 0.022)}px monospace`;
-        ctx.textAlign = 'center';
-        ctx.fillText('San Francisco needs you before they wake up.', cw / 2, logoY + logoH - 8);
-        ctx.globalAlpha = 1;
-    } else {
-        const titleY = ch * 0.14;
-        ctx.fillStyle = '#ff8040';
-        ctx.font = `bold ${Math.floor(cw * 0.09)}px monospace`;
-        ctx.textAlign = 'center';
-        ctx.fillText('DOODY CALLS', cw / 2, titleY);
-
-        ctx.globalAlpha = 0.85;
-        ctx.fillStyle = '#4ecdc4';
-        ctx.font = `${Math.floor(cw * 0.022)}px monospace`;
-        ctx.fillText('San Francisco needs you before they wake up.', cw / 2, titleY + 35);
-        ctx.globalAlpha = 1;
-    }
-
     // ── Layer 9: Touch-first card grid (2x2) at bottom of screen ──
     const dailyDist = DISTRICTS[getDailyDistrictIndex()];
     const selectedIndex = gameState._menuIndex || 0;
@@ -2921,6 +2893,39 @@ function drawTitleScreen() {
     const footerH = 22;
     const gridBottom = ch - footerH;
     const gridTop = gridBottom - (cardH * 2 + gap);
+
+    // ── Layer 8: Wordmark logo (centered between top and card grid) ──
+    const taglineFontSize = Math.floor(cw * 0.022);
+    const taglineGap = 8;
+    if (wordmarkImg.complete && wordmarkImg.naturalWidth > 0) {
+        const logoW = cw * 0.52;
+        const logoH = logoW * (wordmarkImg.naturalHeight / wordmarkImg.naturalWidth);
+        const totalBlockH = logoH + taglineGap + taglineFontSize;
+        const logoY = (gridTop - totalBlockH) / 2;
+        const logoX = (cw - logoW) / 2;
+        ctx.drawImage(wordmarkImg, logoX, logoY, logoW, logoH);
+
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle = '#4ecdc4';
+        ctx.font = `${taglineFontSize}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('San Francisco needs you before they wake up.', cw / 2, logoY + logoH + taglineGap + taglineFontSize * 0.5);
+        ctx.globalAlpha = 1;
+    } else {
+        const titleFontSize = Math.floor(cw * 0.09);
+        const totalBlockH = titleFontSize + taglineGap + taglineFontSize;
+        const titleY = (gridTop - totalBlockH) / 2 + titleFontSize;
+        ctx.fillStyle = '#ff8040';
+        ctx.font = `bold ${titleFontSize}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('DOODY CALLS', cw / 2, titleY);
+
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle = '#4ecdc4';
+        ctx.font = `${taglineFontSize}px monospace`;
+        ctx.fillText('San Francisco needs you before they wake up.', cw / 2, titleY + taglineGap + taglineFontSize);
+        ctx.globalAlpha = 1;
+    }
     const gridLeft = pad;
     const cornerR = 8;
 
@@ -3712,6 +3717,10 @@ function update(dt) {
 }
 
 function titleMenuSelect(idx) {
+    // Prevent confirm from carrying over to next screen
+    inputActions.confirm = false;
+    inputActions._lastConfirm = true;
+
     if (idx === 0) {
         gameState._pendingMode = 'start';
         gameState.screen = 'charSelect';
@@ -3803,21 +3812,25 @@ function updateCharSelect(dt) {
         charCarousel.settled = false;
     }
 
-    // Spring physics: animate offset toward target
+    // Smooth snap animation: exponential ease toward target
     if (!charCarousel.dragging) {
         const targetOffset = (gameState._charIndex || 0) * cardSpacing;
         const diff = targetOffset - charCarousel.offset;
 
-        // Critically-damped spring: snappy, no overshoot
-        const stiffness = 15;
-        const damping = 8;
+        // After a fling, use velocity to coast then decelerate
+        if (Math.abs(charCarousel.velocity) > 10) {
+            charCarousel.offset += charCarousel.velocity * dt;
+            charCarousel.velocity *= Math.pow(0.02, dt); // rapid deceleration
+        }
 
-        charCarousel.velocity += diff * stiffness * dt;
-        charCarousel.velocity *= Math.max(0, 1 - damping * dt);
-        charCarousel.offset += charCarousel.velocity;
+        // Exponential lerp: closes 95% of gap in ~0.12s (very snappy)
+        const lerpSpeed = 25; // higher = snappier
+        const t = 1 - Math.exp(-lerpSpeed * dt);
+        charCarousel.offset += diff * t;
+        charCarousel.velocity *= 0.9; // bleed off residual velocity
 
         // Snap when close enough
-        if (Math.abs(diff) < 1 && Math.abs(charCarousel.velocity) < 0.5) {
+        if (Math.abs(diff) < 0.5) {
             charCarousel.offset = targetOffset;
             charCarousel.velocity = 0;
             charCarousel.settled = true;
