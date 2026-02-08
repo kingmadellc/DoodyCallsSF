@@ -450,7 +450,7 @@ const CHARACTERS = [
         abilityDesc: '+20% move speed',
     },
     {
-        id: 'idaho-bro-1', name: 'Idahoan Brother #1', desc: 'Bald, bearded, built for hauling',
+        id: 'idaho-bro-1', name: 'Idahoan Brother #1', desc: 'Bald, bearded, built for reading',
         color: '#608040', visorColor: '#a0d060', ability: 'armor',
         abilityDesc: 'Immune to first earthquake',
     },
