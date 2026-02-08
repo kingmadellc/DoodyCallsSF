@@ -502,6 +502,55 @@ const CLUTCH_HEADLINES = [
 ];
 
 // ============================================
+// HOBO WISDOM QUOTES
+// ============================================
+const HOBO_NAMES = [
+    'Sidewalk Steve', 'Cardboard Carl', 'Blanket Bill', 'Shopping Cart Sally',
+    'Tarp Tom', 'Freeway Phil', 'Underpass Ursula', 'Dumpster Dave',
+    'Bench Press Betty', 'Pigeon Whisperer Pete', 'Two-Socks Tony', 'Moonbeam Marcy',
+    'Tin Foil Ted', 'Raincoat Rita', 'Newspaper Nick', 'Alleyway Alice',
+];
+
+const HOBO_QUOTES = [
+    "Elohim Earthprayer once told me the sidewalk is just a bed the city paved over out of jealousy.",
+    "You clean these streets, but who cleans your soul? Elohim Earthprayer, that's who. For $5.",
+    "Elohim Earthprayer says every pigeon carries the reincarnated spirit of a failed tech CEO.",
+    "I used to have a 401k. Now I have a shopping cart and inner peace. Elohim Earthprayer showed me the way.",
+    "Elohim Earthprayer whispered to me that recycling is just capitalism making you sort its trash.",
+    "The universe provides. Today it provided half a burrito. Praise Elohim Earthprayer.",
+    "Elohim Earthprayer says we're all just one bad Yelp review away from living under a bridge.",
+    "I don't need a house. The Earth is my house. Elohim Earthprayer is my landlord and he never raises rent.",
+    "Elohim Earthprayer teaches that the man who sleeps on concrete dreams harder than the man on a Casper mattress.",
+    "Before I met Elohim Earthprayer, I was a VP of Product. Now I'm VP of This Bench. Much better title.",
+    "Elohim Earthprayer once meditated so hard a Whole Foods opened across the street. Gentrification is spiritual warfare.",
+    "You think YOU'RE cleaning up? Elohim Earthprayer has been cleaning up auras in this alley since 2019.",
+    "Elohim Earthprayer says the real mess isn't on these streets. It's in your heart. But also on these streets.",
+    "I traded my Tesla for enlightenment. Elohim Earthprayer said it was a fair deal. The Tesla had low mileage.",
+    "Every morning I greet the sunrise. Then Elohim Earthprayer reminds me the sun is just God's ring light.",
+    "Elohim Earthprayer once turned water into kombucha. Nobody asked him to. Nobody wanted it.",
+    "The secret to happiness? Elohim Earthprayer says stop wanting things. Except socks. Always want socks.",
+    "I've lived on this corner for 3 years. I've seen things. Elohim Earthprayer has seen more things. Different things.",
+    "Elohim Earthprayer says if you stare at a parking meter long enough, time itself becomes meaningless. Also you get a ticket.",
+    "They say money can't buy happiness. Elohim Earthprayer says neither can no money. But the parking is free.",
+    "Elohim Earthprayer held a TED talk on this corner once. No microphone. No audience. Powerful stuff.",
+    "You ever notice how a clean street just gets dirty again? Elohim Earthprayer calls that 'the municipal samsara.'",
+    "Elohim Earthprayer says the difference between a tourist and a local is three months and one mugging.",
+    "I'm not homeless. I'm home-free. Elohim Earthprayer trademarked that. He's very entrepreneurial.",
+    "Elohim Earthprayer taught me that every discarded coffee cup is a tiny cathedral for ants.",
+    "Before Elohim Earthprayer, I chased quarterly earnings. Now I chase the ice cream truck. Same energy, better ROI.",
+    "Elohim Earthprayer says the fog isn't weather. It's San Francisco's way of hiding its shame.",
+    "My cardboard sign used to say 'anything helps.' Elohim Earthprayer corrected it to 'nothing matters.' More honest.",
+    "Elohim Earthprayer fasted for 40 days once. Then he remembered he had a Costco membership.",
+    "The pigeons work for Elohim Earthprayer. Don't let anyone tell you otherwise.",
+];
+
+function getRandomHoboQuote() {
+    const name = HOBO_NAMES[Math.floor(Math.random() * HOBO_NAMES.length)];
+    const quote = HOBO_QUOTES[Math.floor(Math.random() * HOBO_QUOTES.length)];
+    return { name, quote };
+}
+
+// ============================================
 // ASSETS
 // ============================================
 const wordmarkImg = new Image();
@@ -589,6 +638,12 @@ let gameState = {
 
     // Pause menu
     pauseMenuIndex: 0,    // Currently selected pause menu item
+
+    // Recent district history (for smart "Next District" randomization)
+    recentDistricts: [],   // Last N district indices played (max 9)
+
+    // Hobo quote for end screen
+    currentHoboQuote: '',
 };
 
 // Mobile detection (touch-capable device)
@@ -1900,6 +1955,8 @@ function updateTimer(dt) {
         gameState.timeBonus = 0;
         gameState.screen = 'gameOver';
         gameState._endMenuIndex = 0;
+        trackRecentDistrict(gameState.district);
+        gameState.currentHoboQuote = getRandomHoboQuote();
         triggerShake(0.5, 12);
         // Generate score text for sharing
         gameState.lastScoreText = generateScoreText(0);
@@ -1957,16 +2014,38 @@ function startDistrict(districtIndex) {
     gameState.camera.y = gameState.player.y - VIEWPORT_HEIGHT / 2;
 }
 
+function getNextRandomDistrict() {
+    // Pick a random district that hasn't been played recently (last 9)
+    const recent = gameState.recentDistricts || [];
+    const available = [];
+    for (let i = 0; i < DISTRICTS.length; i++) {
+        if (!recent.includes(i)) available.push(i);
+    }
+    // If somehow all districts are recent (shouldn't happen with 10 districts and max 9 history),
+    // fall back to any district except the current one
+    if (available.length === 0) {
+        for (let i = 0; i < DISTRICTS.length; i++) {
+            if (i !== gameState.district) available.push(i);
+        }
+    }
+    return available[Math.floor(Math.random() * available.length)];
+}
+
+function trackRecentDistrict(districtIdx) {
+    if (!gameState.recentDistricts) gameState.recentDistricts = [];
+    gameState.recentDistricts.push(districtIdx);
+    // Keep only last 9
+    if (gameState.recentDistricts.length > 9) {
+        gameState.recentDistricts.shift();
+    }
+}
+
 function executeEndScreenAction(action) {
     if (action === 'retry') {
         startDistrict(gameState.district);
     } else if (action === 'next') {
-        const nextDist = gameState.district + 1;
-        if (nextDist < DISTRICTS.length) {
-            startDistrict(nextDist);
-        } else {
-            gameState.screen = 'title';
-        }
+        const nextDist = getNextRandomDistrict();
+        startDistrict(nextDist);
     } else if (action === 'replay') {
         startDistrict(gameState.district);
     } else if (action === 'menu') {
@@ -2026,6 +2105,12 @@ function completeDistrict() {
     gameState.timeBonus = Math.floor(timeLeft);
     gameState.screen = 'districtComplete';
     gameState._endMenuIndex = 0;
+
+    // Track this district as recently played
+    trackRecentDistrict(gameState.district);
+
+    // Pick a hobo quote for the end screen
+    gameState.currentHoboQuote = getRandomHoboQuote();
 
     // Generate score share text
     gameState.lastScoreText = generateScoreText(stars);
@@ -3330,11 +3415,10 @@ function drawGameOverScreen() {
     ctx.fillStyle = 'rgba(10,10,30,0.82)';
     ctx.fillRect(0, 0, cw, ch);
 
-    // ── Bottom card grid (2 cards: Retry, Quit) ──
+    // ── Bottom card grid ──
     const pad = Math.floor(cw * 0.03);
     const gap = Math.floor(cw * 0.025);
     const gridW = cw - pad * 2;
-    const cardW = Math.floor((gridW - gap) / 2);
     const cardH = Math.floor(ch * 0.13);
     const footerH = 22;
     const gridBottom = ch - footerH;
@@ -3342,8 +3426,11 @@ function drawGameOverScreen() {
 
     const cardItems = [
         { icon: '🔄', label: 'RETRY', desc: 'Try again', accent: '#ff8040', action: 'retry' },
-        { icon: '🏠', label: 'MENU', desc: 'Back to title', accent: '#4ecdc4', action: 'menu' },
+        { icon: '➡️', label: 'NEXT', desc: 'Random district', accent: '#4ecdc4', action: 'next' },
+        { icon: '🏠', label: 'MENU', desc: 'Back to title', accent: '#ffe66d', action: 'menu' },
     ];
+
+    const cardW = Math.floor((gridW - gap * (cardItems.length - 1)) / cardItems.length);
 
     endScreenCardRects = [];
 
@@ -3444,10 +3531,8 @@ function drawGameOverScreen() {
     ctx.font = `${Math.floor(cw * 0.018)}px monospace`;
     ctx.fillText(`${gameState.messesClean} of ${gameState.totalMesses} messes`, cw / 2, statsY + statsH * 0.75);
 
-    // Score share card
-    const shareY = statsY + statsH + Math.floor(ch * 0.03);
-    const shareH = Math.floor(ch * 0.18);
-    drawScoreShare(statsX, shareY, statsW, shareH, 0);
+    // Hobo wisdom quote
+    drawHoboQuote(statsX, statsY + statsH + Math.floor(ch * 0.025), statsW, gridTop - (statsY + statsH) - Math.floor(ch * 0.05));
 }
 
 // ============================================
@@ -3465,8 +3550,6 @@ function drawDistrictCompleteScreen() {
     const district = DISTRICTS[gameState.district];
     const pct = gameState.totalMesses > 0 ?
         Math.floor((gameState.messesClean / gameState.totalMesses) * 100) : 0;
-    const nextDist = gameState.district + 1;
-    const hasNext = nextDist < DISTRICTS.length;
 
     // Stars
     let stars = 0;
@@ -3483,16 +3566,11 @@ function drawDistrictCompleteScreen() {
     const gridBottom = ch - footerH;
     const gridTop = gridBottom - cardH;
 
-    const cardItems = hasNext
-        ? [
-            { icon: '➡️', label: 'NEXT', desc: DISTRICTS[nextDist].name, accent: '#4ecdc4', action: 'next' },
-            { icon: '🔄', label: 'REPLAY', desc: district.name, accent: '#ff8040', action: 'replay' },
-            { icon: '🏠', label: 'MENU', desc: 'Back to title', accent: '#ffe66d', action: 'menu' },
-          ]
-        : [
-            { icon: '🏠', label: 'MENU', desc: 'All complete!', accent: '#4ecdc4', action: 'menu' },
-            { icon: '🔄', label: 'REPLAY', desc: district.name, accent: '#ff8040', action: 'replay' },
-          ];
+    const cardItems = [
+        { icon: '➡️', label: 'NEXT', desc: 'Random district', accent: '#4ecdc4', action: 'next' },
+        { icon: '🔄', label: 'REPLAY', desc: district.name, accent: '#ff8040', action: 'replay' },
+        { icon: '🏠', label: 'MENU', desc: 'Back to title', accent: '#ffe66d', action: 'menu' },
+    ];
 
     const cardW = Math.floor((gridW - gap * (cardItems.length - 1)) / cardItems.length);
 
@@ -3606,10 +3684,68 @@ function drawDistrictCompleteScreen() {
     ctx.fillText(`Grade: ${districtGrade}  •  City: ${gameState.cityGrade}`, cw / 2, statsY + statsH * 0.82);
 
     // Score share card
-    const shareY = statsY + statsH + Math.floor(ch * 0.025);
-    const shareBottom = gridTop - Math.floor(ch * 0.025);
-    const shareH = Math.max(Math.floor(ch * 0.12), shareBottom - shareY);
+    const shareY = statsY + statsH + Math.floor(ch * 0.02);
+    const shareH = Math.floor(ch * 0.12);
     drawScoreShare(statsX, shareY, statsW, shareH, stars);
+
+    // Hobo wisdom quote
+    const quoteY = shareY + shareH + Math.floor(ch * 0.015);
+    const quoteH = gridTop - quoteY - Math.floor(ch * 0.015);
+    if (quoteH > 20) {
+        drawHoboQuote(statsX, quoteY, statsW, quoteH);
+    }
+}
+
+function drawHoboQuote(x, y, w, h) {
+    const hq = gameState.currentHoboQuote;
+    if (!hq || !hq.quote) return;
+
+    const cw = canvas.width;
+
+    // Quote card background
+    ctx.fillStyle = 'rgba(180,140,60,0.08)';
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 6);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(180,140,60,0.20)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 6);
+    ctx.stroke();
+
+    // Hobo name
+    ctx.fillStyle = '#c0a050';
+    ctx.font = `bold ${Math.floor(cw * 0.016)}px monospace`;
+    ctx.textAlign = 'left';
+    ctx.fillText(`\u{1F9D4} ${hq.name} says:`, x + 10, y + 14);
+
+    // Quote text (word-wrapped)
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.font = `italic ${Math.floor(cw * 0.014)}px monospace`;
+    ctx.textAlign = 'left';
+
+    const words = hq.quote.split(' ');
+    let line = '"';
+    let lineY = y + 30;
+    const maxWidth = w - 20;
+    const lineH = Math.floor(cw * 0.019);
+
+    for (const word of words) {
+        const testLine = line + word + ' ';
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxWidth && line !== '"') {
+            if (lineY + lineH > y + h - 4) break; // don't overflow card
+            ctx.fillText(line.trim(), x + 10, lineY);
+            line = word + ' ';
+            lineY += lineH;
+        } else {
+            line = testLine;
+        }
+    }
+    // Last line with closing quote
+    if (lineY + lineH <= y + h + 2) {
+        ctx.fillText((line.trim() + '"'), x + 10, lineY);
+    }
 }
 
 function drawScoreShare(x, y, w, h, stars) {
@@ -4084,12 +4220,13 @@ function update(dt) {
         if (keys['KeyC'] || keyBuffer['KeyC']) {
             shareScore();
         }
-        // Navigate cards
+        // Navigate cards (3 cards: Retry, Next, Menu)
         if (inputActions.left) gameState._endMenuIndex = Math.max(0, gameState._endMenuIndex - 1);
-        if (inputActions.right) gameState._endMenuIndex = Math.min(1, gameState._endMenuIndex + 1);
+        if (inputActions.right) gameState._endMenuIndex = Math.min(2, gameState._endMenuIndex + 1);
         // Confirm selection
         if (inputActions.confirm) {
-            executeEndScreenAction(gameState._endMenuIndex === 0 ? 'retry' : 'menu');
+            const rect = endScreenCardRects[gameState._endMenuIndex];
+            if (rect) executeEndScreenAction(rect.action);
         }
     } else if (gameState.screen === 'districtComplete') {
         if (gameState._endMenuIndex === undefined) gameState._endMenuIndex = 0;
@@ -4097,12 +4234,9 @@ function update(dt) {
         if (keys['KeyC'] || keyBuffer['KeyC']) {
             shareScore();
         }
-        const nextDist = gameState.district + 1;
-        const hasNext = nextDist < DISTRICTS.length;
-        const maxIdx = hasNext ? 2 : 1;
-        // Navigate cards
+        // Navigate cards (3 cards: Next, Replay, Menu)
         if (inputActions.left) gameState._endMenuIndex = Math.max(0, gameState._endMenuIndex - 1);
-        if (inputActions.right) gameState._endMenuIndex = Math.min(maxIdx, gameState._endMenuIndex + 1);
+        if (inputActions.right) gameState._endMenuIndex = Math.min(2, gameState._endMenuIndex + 1);
         // Confirm selection
         if (inputActions.confirm) {
             const rect = endScreenCardRects[gameState._endMenuIndex];
