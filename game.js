@@ -545,7 +545,7 @@ let gameState = {
     districtBests: {},     // { districtId: { pct, time, stars } }
     cityGrade: 'F',
     totalStars: 0,
-    districtsUnlocked: 1,  // How many districts are unlocked
+    districtsUnlocked: 10, // All districts unlocked from start
 
     // Headlines collection
     headlinesSeen: [],     // Array of headline strings the player has earned
@@ -1963,14 +1963,6 @@ function completeDistrict() {
         gameState.districtBests[distId] = { pct: pctInt, time: Math.floor(timeLeft), stars };
     }
 
-    // Unlock next district
-    if (stars >= 1 && gameState.district + 1 < DISTRICTS.length) {
-        const nextUnlock = gameState.district + 2; // district index + 1 = districtId, +1 for next
-        if (nextUnlock > gameState.districtsUnlocked) {
-            gameState.districtsUnlocked = nextUnlock;
-        }
-    }
-
     // Recalculate total stars and grade
     let total = 0;
     for (const key in gameState.districtStars) {
@@ -2868,23 +2860,27 @@ function drawTitleScreen() {
     }
     ctx.globalAlpha = 1;
 
-    // ── Layer 5–6: City skyline ──
+    // ── Layer 5–6: City skyline (shifted up so buildings are visible) ──
+    const skylineShift = Math.floor(ch * 0.38);
+    ctx.save();
+    ctx.translate(0, -skylineShift);
     drawCitySkyline();
+    ctx.restore();
 
-    // ── Layer 7: Full-screen darken for readability ──
-    const darkGrad = ctx.createLinearGradient(0, ch * 0.28, 0, ch);
+    // ── Layer 7: Darken only the lower portion where cards go ──
+    const darkStart = ch * 0.50;
+    const darkGrad = ctx.createLinearGradient(0, darkStart - ch * 0.12, 0, darkStart + ch * 0.08);
     darkGrad.addColorStop(0, 'rgba(10,10,30,0.0)');
-    darkGrad.addColorStop(0.15, 'rgba(10,10,30,0.75)');
-    darkGrad.addColorStop(1, 'rgba(10,10,30,0.88)');
+    darkGrad.addColorStop(1, 'rgba(10,10,30,0.92)');
     ctx.fillStyle = darkGrad;
-    ctx.fillRect(0, 0, cw, ch);
+    ctx.fillRect(0, darkStart - ch * 0.12, cw, ch - darkStart + ch * 0.12);
 
-    // ── Layer 8: Wordmark logo (no fallback — just wait for asset) ──
+    // ── Layer 8: Wordmark logo ──
     if (wordmarkImg.complete && wordmarkImg.naturalWidth > 0) {
         const logoW = cw * 0.52;
         const logoH = logoW * (wordmarkImg.naturalHeight / wordmarkImg.naturalWidth);
         const logoX = (cw - logoW) / 2;
-        const logoY = ch * 0.025;
+        const logoY = ch * 0.015;
         ctx.drawImage(wordmarkImg, logoX, logoY, logoW, logoH);
 
         ctx.globalAlpha = 0.85;
@@ -2893,15 +2889,27 @@ function drawTitleScreen() {
         ctx.textAlign = 'center';
         ctx.fillText('San Francisco needs you before they wake up.', cw / 2, logoY + logoH - 8);
         ctx.globalAlpha = 1;
+    } else {
+        const titleY = ch * 0.14;
+        ctx.fillStyle = '#ff8040';
+        ctx.font = `bold ${Math.floor(cw * 0.09)}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText('DOODY CALLS', cw / 2, titleY);
+
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle = '#4ecdc4';
+        ctx.font = `${Math.floor(cw * 0.022)}px monospace`;
+        ctx.fillText('San Francisco needs you before they wake up.', cw / 2, titleY + 35);
+        ctx.globalAlpha = 1;
     }
 
-    // ── Layer 9: Touch-first card grid (2x2) ──
+    // ── Layer 9: Touch-first card grid (2x2) at bottom of screen ──
     const dailyDist = DISTRICTS[getDailyDistrictIndex()];
     const selectedIndex = gameState._menuIndex || 0;
     const cardItems = [
         { icon: '\u{1F9F9}', label: 'START', desc: 'Begin District 1', accent: '#4ecdc4' },
         { icon: '\u26A1',    label: 'QUICK', desc: 'Random district', accent: '#ff8040' },
-        { icon: '\u{1F5FA}', label: 'DISTRICTS', desc: `${gameState.districtsUnlocked}/${DISTRICTS.length} unlocked`, accent: '#ffe66d' },
+        { icon: '\u{1F5FA}', label: 'DISTRICTS', desc: 'Select district', accent: '#ffe66d' },
         { icon: '\u{1F4C5}', label: 'DAILY', desc: dailyDist.name, accent: '#ff6b9d' },
     ];
 
@@ -2909,8 +2917,10 @@ function drawTitleScreen() {
     const gridW = cw - pad * 2;
     const gap = Math.floor(cw * 0.025);
     const cardW = Math.floor((gridW - gap) / 2);
-    const cardH = Math.floor(ch * 0.17);
-    const gridTop = ch * 0.39;
+    const cardH = Math.floor(ch * 0.15);
+    const footerH = 22;
+    const gridBottom = ch - footerH;
+    const gridTop = gridBottom - (cardH * 2 + gap);
     const gridLeft = pad;
     const cornerR = 8;
 
@@ -3272,108 +3282,235 @@ function drawScoreShare(x, y, w, h, stars) {
 // ============================================
 // DRAWING - CHARACTER SELECT
 // ============================================
+// ── Character select carousel state ──
+let charCarousel = {
+    offset: 0,         // current pixel offset
+    velocity: 0,       // current swipe velocity
+    targetIndex: 0,    // snap target
+    dragging: false,
+    dragStartX: 0,
+    dragStartOffset: 0,
+    lastDragX: 0,
+    lastDragTime: 0,
+    settled: true,
+};
+
+// ── Confirm button hit rect ──
+let charConfirmBtnRect = null;
+
+function getCharCardSpacing() { return canvas.width * 0.72; }
+
 function drawCharSelectScreen() {
+    const cw = canvas.width;
+    const ch = canvas.height;
+    const t = animCache.time;
+    const numChars = CHARACTERS.length;
+
+    // Background: sky + skyline
     ctx.fillStyle = COLORS.uiBg;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, cw, ch);
+
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, ch);
+    skyGrad.addColorStop(0.0, '#0a0a1e');
+    skyGrad.addColorStop(0.4, '#141432');
+    skyGrad.addColorStop(0.7, '#1e1440');
+    skyGrad.addColorStop(1.0, '#2a1a3a');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, cw, ch);
+
     drawCitySkyline();
 
-    // Title
-    ctx.fillStyle = COLORS.uiAccent;
-    ctx.font = `bold ${Math.floor(canvas.width * 0.045)}px monospace`;
-    ctx.textAlign = 'center';
-    ctx.fillText('CHOOSE YOUR WORKER', canvas.width / 2, canvas.height * 0.12);
+    // Darken overlay
+    ctx.fillStyle = 'rgba(10,10,30,0.70)';
+    ctx.fillRect(0, 0, cw, ch);
 
-    const idx = gameState._charIndex || 0;
-    const char = CHARACTERS[idx];
-
-    // Character preview (big hazmat suit)
-    const previewX = canvas.width / 2;
-    const previewY = canvas.height * 0.35;
-    const sz = 64;
-
-    // Shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    // ── Back button (always visible) ──
+    const bbW = 70, bbH = 34;
+    const bbX = 12, bbY = 12;
+    mobileBackBtnRect = { x: bbX, y: bbY, w: bbW, h: bbH };
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
     ctx.beginPath();
-    ctx.ellipse(previewX, previewY + sz / 2 + 4, sz / 2, 8, 0, 0, Math.PI * 2);
+    ctx.roundRect(bbX, bbY, bbW, bbH, 6);
     ctx.fill();
-
-    // Body
-    ctx.fillStyle = char.color;
-    ctx.fillRect(previewX - sz / 3, previewY - sz / 3, sz * 2 / 3, sz * 2 / 3);
-
-    // Head
-    ctx.fillRect(previewX - sz / 4, previewY - sz / 2, sz / 2, sz / 3);
-
-    // Visor
-    ctx.fillStyle = char.visorColor;
-    ctx.fillRect(previewX - sz / 5, previewY - sz / 2 + 8, sz * 2 / 5, sz / 6);
-
-    // Boots
-    ctx.fillStyle = char.bootsColor || '#3a3a3a';
-    ctx.fillRect(previewX - sz / 3, previewY + sz / 3 - 4, sz / 4, 8);
-    ctx.fillRect(previewX + sz / 12, previewY + sz / 3 - 4, sz / 4, 8);
-
-    // Name
-    ctx.fillStyle = char.color;
-    ctx.font = `bold ${Math.floor(canvas.width * 0.04)}px monospace`;
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(bbX, bbY, bbW, bbH, 6);
+    ctx.stroke();
+    ctx.fillStyle = '#8899aa';
+    ctx.font = 'bold 13px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(char.name, previewX, previewY + sz / 2 + 35);
+    ctx.fillText('\u2190 Back', bbX + bbW / 2, bbY + 22);
 
-    // Description
-    ctx.fillStyle = '#aaa';
-    ctx.font = `${Math.floor(canvas.width * 0.022)}px monospace`;
-    ctx.fillText(char.desc, previewX, previewY + sz / 2 + 55);
-
-    // Ability
-    ctx.fillStyle = COLORS.uiGold;
-    ctx.font = `bold ${Math.floor(canvas.width * 0.02)}px monospace`;
-    ctx.fillText(`Ability: ${char.abilityDesc}`, previewX, previewY + sz / 2 + 75);
-
-    // Left/right arrows
-    const arrowBounce = Math.sin(animCache.time * 6) * 4;
-    ctx.fillStyle = COLORS.uiAccent;
-    ctx.font = `bold ${Math.floor(canvas.width * 0.06)}px monospace`;
+    // ── Title ──
+    ctx.fillStyle = '#8899aa';
+    ctx.font = `${Math.floor(cw * 0.025)}px monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText('<', canvas.width * 0.12 + arrowBounce, previewY + 5);
-    ctx.fillText('>', canvas.width * 0.88 - arrowBounce, previewY + 5);
+    ctx.fillText('CHOOSE YOUR WORKER', cw / 2, ch * 0.09);
 
-    // Character dots
-    const dotY = canvas.height * 0.78;
-    for (let i = 0; i < CHARACTERS.length; i++) {
-        ctx.fillStyle = i === idx ? CHARACTERS[i].color : '#333';
+    // ── Carousel ──
+    const cardSpacing = getCharCardSpacing();
+    const cardW = cw * 0.58;
+    const cardH = ch * 0.52;
+    const centerY = ch * 0.43;
+    const centerX = cw / 2;
+
+    const currentFrac = charCarousel.offset / cardSpacing;
+    const activeIdx = Math.round(currentFrac);
+
+    const visibleRange = 2;
+    for (let di = -visibleRange; di <= visibleRange; di++) {
+        let i = activeIdx + di;
+        if (i < 0 || i >= numChars) continue;
+
+        const cardCenterX = centerX + (i * cardSpacing - charCarousel.offset);
+        const distFromCenter = Math.abs(cardCenterX - centerX);
+        const normalizedDist = Math.min(distFromCenter / cardSpacing, 1.5);
+
+        const scale = 1.0 - normalizedDist * 0.25;
+        const alpha = 1.0 - normalizedDist * 0.5;
+        if (alpha <= 0.02 || scale <= 0.3) continue;
+
+        const char = CHARACTERS[i];
+        const scaledW = cardW * scale;
+        const scaledH = cardH * scale;
+        const cx = cardCenterX - scaledW / 2;
+        const cy = centerY - scaledH / 2;
+        const isActive = i === activeIdx && normalizedDist < 0.15;
+
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, alpha);
+
+        // Card background
+        ctx.fillStyle = isActive ? 'rgba(78,205,196,0.12)' : 'rgba(255,255,255,0.06)';
         ctx.beginPath();
-        ctx.arc(canvas.width / 2 + (i - CHARACTERS.length / 2 + 0.5) * 16, dotY, 4, 0, Math.PI * 2);
+        ctx.roundRect(cx, cy, scaledW, scaledH, 10 * scale);
+        ctx.fill();
+
+        // Card border
+        ctx.strokeStyle = isActive ? `${char.color}90` : 'rgba(255,255,255,0.08)';
+        ctx.lineWidth = isActive ? 2 : 1;
+        ctx.beginPath();
+        ctx.roundRect(cx, cy, scaledW, scaledH, 10 * scale);
+        ctx.stroke();
+
+        // Character preview
+        const prevCX = cardCenterX;
+        const prevCY = cy + scaledH * 0.32;
+        const sz = 80 * scale;
+
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.beginPath();
+        ctx.ellipse(prevCX, prevCY + sz / 2 + 6 * scale, sz / 2, 8 * scale, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = char.color;
+        ctx.fillRect(prevCX - sz / 3, prevCY - sz / 3, sz * 2 / 3, sz * 2 / 3);
+        ctx.fillRect(prevCX - sz / 4, prevCY - sz / 2, sz / 2, sz / 3);
+
+        ctx.fillStyle = char.visorColor;
+        ctx.fillRect(prevCX - sz / 5, prevCY - sz / 2 + 8 * scale, sz * 2 / 5, sz / 6);
+
+        ctx.fillStyle = char.bootsColor || '#3a3a3a';
+        ctx.fillRect(prevCX - sz / 3, prevCY + sz / 3 - 4 * scale, sz / 4, 8 * scale);
+        ctx.fillRect(prevCX + sz / 12, prevCY + sz / 3 - 4 * scale, sz / 4, 8 * scale);
+
+        // Name
+        ctx.fillStyle = char.color;
+        ctx.font = `bold ${Math.floor(cw * 0.036 * scale)}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText(char.name, prevCX, cy + scaledH * 0.64);
+
+        // Description
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.font = `${Math.floor(cw * 0.02 * scale)}px monospace`;
+        ctx.fillText(char.desc, prevCX, cy + scaledH * 0.72);
+
+        // Ability badge (active card only)
+        if (isActive) {
+            const abilityY = cy + scaledH * 0.82;
+            const badgeW = cw * 0.42;
+            const badgeH = 24 * scale;
+            ctx.fillStyle = 'rgba(78,205,196,0.15)';
+            ctx.beginPath();
+            ctx.roundRect(prevCX - badgeW / 2, abilityY - badgeH / 2, badgeW, badgeH, 4);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(78,205,196,0.3)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(prevCX - badgeW / 2, abilityY - badgeH / 2, badgeW, badgeH, 4);
+            ctx.stroke();
+
+            ctx.fillStyle = COLORS.uiGold;
+            ctx.font = `bold ${Math.floor(cw * 0.018)}px monospace`;
+            ctx.fillText(`\u2B50 ${char.abilityDesc}`, prevCX, abilityY + 5);
+        }
+
+        ctx.restore();
+    }
+
+    // ── Page indicator dots ──
+    const dotY = ch * 0.76;
+    const dotGap = 14;
+    const totalDotsW = (numChars - 1) * dotGap;
+    for (let i = 0; i < numChars; i++) {
+        const dx = cw / 2 - totalDotsW / 2 + i * dotGap;
+        const isNear = Math.abs(i - currentFrac) < 0.6;
+        const dotR = isNear ? 4 : 2.5;
+        ctx.fillStyle = isNear ? CHARACTERS[i].color : 'rgba(255,255,255,0.2)';
+        ctx.beginPath();
+        ctx.arc(dx, dotY, dotR, 0, Math.PI * 2);
         ctx.fill();
     }
 
-    // Confirm hint
-    const blink = Math.sin(animCache.time * 4) > 0;
-    if (blink) {
-        ctx.fillStyle = COLORS.uiAccent;
-        ctx.font = 'bold 12px monospace';
+    // ── Swipe hint arrows ──
+    if (charCarousel.settled && !charCarousel.dragging) {
+        const hintAlpha = 0.4 + Math.sin(t * 3) * 0.15;
+        ctx.globalAlpha = hintAlpha;
+        ctx.fillStyle = '#4ecdc4';
+        const arrowSize = Math.floor(cw * 0.05);
+        ctx.font = `${arrowSize}px monospace`;
         ctx.textAlign = 'center';
-        if (isMobile) {
-            ctx.fillText('Tap center to confirm  •  Swipe to browse', canvas.width / 2, canvas.height * 0.90);
-        } else {
-            ctx.fillText('ENTER to confirm  •  ESC to go back', canvas.width / 2, canvas.height * 0.92);
-        }
+        if (activeIdx > 0) ctx.fillText('\u2039', cw * 0.06, centerY + 4);
+        if (activeIdx < numChars - 1) ctx.fillText('\u203A', cw * 0.94, centerY + 4);
+        ctx.globalAlpha = 1;
     }
 
-    // Mobile back button
-    if (isMobile) {
-        const bw = 60, bh = 28;
-        const bx = 10, by = 10;
-        mobileBackBtnRect = { x: bx, y: by, w: bw, h: bh };
-        ctx.fillStyle = 'rgba(255,255,255,0.1)';
-        ctx.fillRect(bx, by, bw, bh);
-        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(bx, by, bw, bh);
-        ctx.fillStyle = '#aaa';
-        ctx.font = 'bold 12px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('← Back', bx + bw / 2, by + 18);
-    }
+    // ── Confirm button ──
+    const btnW = cw * 0.55;
+    const btnH = ch * 0.072;
+    const btnX = (cw - btnW) / 2;
+    const btnY = ch * 0.83;
+    charConfirmBtnRect = { x: btnX, y: btnY, w: btnW, h: btnH };
+
+    const activeChar = CHARACTERS[gameState._charIndex || 0];
+    const btnPulse = 1.0 + Math.sin(t * 4) * 0.015;
+
+    ctx.save();
+    ctx.translate(btnX + btnW / 2, btnY + btnH / 2);
+    ctx.scale(btnPulse, btnPulse);
+    ctx.translate(-(btnX + btnW / 2), -(btnY + btnH / 2));
+
+    const btnGrad = ctx.createLinearGradient(btnX, btnY, btnX, btnY + btnH);
+    btnGrad.addColorStop(0, activeChar.color);
+    btnGrad.addColorStop(1, activeChar.color + '80');
+    ctx.fillStyle = btnGrad;
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, btnW, btnH, btnH / 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${Math.floor(cw * 0.028)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`SELECT ${activeChar.name.toUpperCase()}`, cw / 2, btnY + btnH * 0.62);
+
+    ctx.restore();
+
+    // ── Counter ──
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.font = `${Math.floor(cw * 0.018)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`${(gameState._charIndex || 0) + 1} / ${numChars}`, cw / 2, ch * 0.93);
 }
 
 // ============================================
@@ -3574,65 +3711,126 @@ function update(dt) {
     }
 }
 
+function titleMenuSelect(idx) {
+    if (idx === 0) {
+        gameState._pendingMode = 'start';
+        gameState.screen = 'charSelect';
+        gameState._charIndex = gameState.selectedCharacter;
+        charCarousel.offset = (gameState._charIndex || 0) * getCharCardSpacing();
+        charCarousel.velocity = 0;
+        charCarousel.settled = true;
+    } else if (idx === 1) {
+        gameState._pendingMode = 'quick';
+        gameState.screen = 'charSelect';
+        gameState._charIndex = gameState.selectedCharacter;
+        charCarousel.offset = (gameState._charIndex || 0) * getCharCardSpacing();
+        charCarousel.velocity = 0;
+        charCarousel.settled = true;
+    } else if (idx === 2) {
+        gameState.screen = 'districtSelect';
+        gameState._distSelectIndex = 0;
+    } else if (idx === 3) {
+        const dailyIdx = getDailyDistrictIndex();
+        gameState._pendingMode = 'daily';
+        gameState._pendingDistrict = dailyIdx;
+        gameState.screen = 'charSelect';
+        gameState._charIndex = gameState.selectedCharacter;
+        charCarousel.offset = (gameState._charIndex || 0) * getCharCardSpacing();
+        charCarousel.velocity = 0;
+        charCarousel.settled = true;
+    }
+}
+
 function updateTitleMenu(dt) {
     if (gameState._menuIndex === undefined) gameState._menuIndex = 0;
 
-    if (inputActions.up) {
-        gameState._menuIndex = Math.max(0, gameState._menuIndex - 1);
+    // 2x2 grid navigation: up/down moves between rows, left/right between columns
+    const idx = gameState._menuIndex;
+    const col = idx % 2;
+    const row = Math.floor(idx / 2);
+
+    if (inputActions.up && row > 0) {
+        gameState._menuIndex = (row - 1) * 2 + col;
     }
-    if (inputActions.down) {
-        gameState._menuIndex = Math.min(3, gameState._menuIndex + 1);
+    if (inputActions.down && row < 1) {
+        gameState._menuIndex = (row + 1) * 2 + col;
     }
+    if (inputActions.left && col > 0) {
+        gameState._menuIndex = row * 2 + (col - 1);
+    }
+    if (inputActions.right && col < 1) {
+        gameState._menuIndex = row * 2 + (col + 1);
+    }
+
     if (inputActions.confirm) {
-        if (gameState._menuIndex === 0) {
-            // Start shift — go to character select first
-            gameState._pendingMode = 'start';
-            gameState.screen = 'charSelect';
-            gameState._charIndex = gameState.selectedCharacter;
-        } else if (gameState._menuIndex === 1) {
-            // Quick shift — character select then random district
-            gameState._pendingMode = 'quick';
-            gameState.screen = 'charSelect';
-            gameState._charIndex = gameState.selectedCharacter;
-        } else if (gameState._menuIndex === 2) {
-            // District select
-            gameState.screen = 'districtSelect';
-            gameState._distSelectIndex = 0;
-        } else if (gameState._menuIndex === 3) {
-            // Daily district
-            const dailyIdx = getDailyDistrictIndex();
-            gameState._pendingMode = 'daily';
-            gameState._pendingDistrict = dailyIdx;
-            gameState.screen = 'charSelect';
-            gameState._charIndex = gameState.selectedCharacter;
-        }
+        titleMenuSelect(gameState._menuIndex);
+    }
+}
+
+function charSelectConfirm() {
+    gameState.selectedCharacter = gameState._charIndex;
+    saveProgress();
+    const mode = gameState._pendingMode || 'start';
+    if (mode === 'start') {
+        startDistrict(0);
+    } else if (mode === 'quick') {
+        const idx = Math.floor(Math.random() * DISTRICTS.length);
+        startDistrict(idx);
+    } else if (mode === 'daily') {
+        startDistrict(gameState._pendingDistrict || 0);
+    } else if (mode === 'select') {
+        startDistrict(gameState._pendingDistrict || 0);
     }
 }
 
 function updateCharSelect(dt) {
     if (gameState._charIndex === undefined) gameState._charIndex = 0;
 
-    if (inputActions.left) {
-        gameState._charIndex = (gameState._charIndex - 1 + CHARACTERS.length) % CHARACTERS.length;
+    const cardSpacing = getCharCardSpacing();
+    const numChars = CHARACTERS.length;
+
+    // Keyboard left/right: snap to prev/next
+    if (inputActions.left && !charCarousel.dragging) {
+        const newIdx = Math.max(0, (gameState._charIndex || 0) - 1);
+        gameState._charIndex = newIdx;
+        charCarousel.velocity = 0;
+        charCarousel.settled = false;
     }
-    if (inputActions.right) {
-        gameState._charIndex = (gameState._charIndex + 1) % CHARACTERS.length;
+    if (inputActions.right && !charCarousel.dragging) {
+        const newIdx = Math.min(numChars - 1, (gameState._charIndex || 0) + 1);
+        gameState._charIndex = newIdx;
+        charCarousel.velocity = 0;
+        charCarousel.settled = false;
     }
-    if (inputActions.confirm) {
-        gameState.selectedCharacter = gameState._charIndex;
-        saveProgress();
-        const mode = gameState._pendingMode || 'start';
-        if (mode === 'start') {
-            startDistrict(0);
-        } else if (mode === 'quick') {
-            const idx = Math.floor(Math.random() * Math.min(gameState.districtsUnlocked, DISTRICTS.length));
-            startDistrict(idx);
-        } else if (mode === 'daily') {
-            startDistrict(gameState._pendingDistrict || 0);
-        } else if (mode === 'select') {
-            startDistrict(gameState._pendingDistrict || 0);
+
+    // Spring physics: animate offset toward target
+    if (!charCarousel.dragging) {
+        const targetOffset = (gameState._charIndex || 0) * cardSpacing;
+        const diff = targetOffset - charCarousel.offset;
+
+        // Critically-damped spring: snappy, no overshoot
+        const stiffness = 15;
+        const damping = 8;
+
+        charCarousel.velocity += diff * stiffness * dt;
+        charCarousel.velocity *= Math.max(0, 1 - damping * dt);
+        charCarousel.offset += charCarousel.velocity;
+
+        // Snap when close enough
+        if (Math.abs(diff) < 1 && Math.abs(charCarousel.velocity) < 0.5) {
+            charCarousel.offset = targetOffset;
+            charCarousel.velocity = 0;
+            charCarousel.settled = true;
+        } else {
+            charCarousel.settled = false;
         }
     }
+
+    // Confirm selection
+    if (inputActions.confirm) {
+        charSelectConfirm();
+    }
+
     // Back to title
     if (inputActions.pause) {
         gameState.screen = 'title';
@@ -3676,6 +3874,8 @@ function draw() {
     shareCardRect = null;
     mobileBackBtnRect = null;
     mobileFinishBtnRect = null;
+    charConfirmBtnRect = null;
+    titleCardRects = [];
 
     // Clear
     ctx.fillStyle = COLORS.uiBg;
@@ -3858,29 +4058,18 @@ function initGame() {
     }
 
     // ── Handle swipe on MENU screens (one-shot actions) ──
+    // NOTE: charSelect uses direct drag handling, not one-shot swipes
     function handleMenuSwipe(dir) {
         const screen = gameState.screen;
-
-        if (screen === 'charSelect') {
-            if (dir === 'left')  { fireKey('ArrowLeft');  return true; }
-            if (dir === 'right') { fireKey('ArrowRight'); return true; }
-            if (dir === 'down')  { fireKey('Escape');     return true; }  // Back
-            return false;
-        }
 
         if (screen === 'districtSelect') {
             if (dir === 'up')    { fireKey('ArrowUp');    return true; }
             if (dir === 'down')  { fireKey('ArrowDown');  return true; }
-            if (dir === 'left')  { fireKey('Escape');     return true; }  // Back
+            if (dir === 'left')  { fireKey('Escape');     return true; }
             return false;
         }
 
-        if (screen === 'title') {
-            if (dir === 'up')   { fireKey('ArrowUp');   return true; }
-            if (dir === 'down') { fireKey('ArrowDown'); return true; }
-            return false;
-        }
-
+        // Title: no swipe navigation needed (cards are tappable)
         return false;
     }
 
@@ -3890,7 +4079,7 @@ function initGame() {
         const cw = canvas.width;
         const ch = canvas.height;
 
-        // Check mobile back button on any screen
+        // Check back button on any screen
         if (mobileBackBtnRect &&
             canvasX >= mobileBackBtnRect.x && canvasX <= mobileBackBtnRect.x + mobileBackBtnRect.w &&
             canvasY >= mobileBackBtnRect.y && canvasY <= mobileBackBtnRect.y + mobileBackBtnRect.h) {
@@ -3898,19 +4087,28 @@ function initGame() {
             return true;
         }
 
-        // Character Select: left zone / right zone / center confirm
+        // Title: hit test against card rects
+        if (screen === 'title') {
+            for (const card of titleCardRects) {
+                if (canvasX >= card.x && canvasX <= card.x + card.w &&
+                    canvasY >= card.y && canvasY <= card.y + card.h) {
+                    gameState._menuIndex = card.idx;
+                    titleMenuSelect(card.idx);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Character Select: tap confirm button, or tap card to confirm
         if (screen === 'charSelect') {
-            if (canvasX < cw * 0.25) {
-                fireKey('ArrowLeft');
+            if (charConfirmBtnRect &&
+                canvasX >= charConfirmBtnRect.x && canvasX <= charConfirmBtnRect.x + charConfirmBtnRect.w &&
+                canvasY >= charConfirmBtnRect.y && canvasY <= charConfirmBtnRect.y + charConfirmBtnRect.h) {
+                charSelectConfirm();
                 return true;
             }
-            if (canvasX > cw * 0.75) {
-                fireKey('ArrowRight');
-                return true;
-            }
-            // Center = confirm
-            fireKey('Space');
-            return true;
+            return false;
         }
 
         // District Select: tap a row to select, tap selected row to confirm
@@ -3925,7 +4123,7 @@ function initGame() {
                 const tappedIdx = Math.floor(relY / itemH);
                 if (tappedIdx >= 0 && tappedIdx < DISTRICTS.length) {
                     if (tappedIdx === gameState._distSelectIndex) {
-                        fireKey('Space');  // Confirm
+                        fireKey('Space');
                     } else {
                         gameState._distSelectIndex = tappedIdx;
                     }
@@ -3947,43 +4145,88 @@ function initGame() {
             return true;
         }
 
-        // Title: tap = confirm
-        if (screen === 'title') {
-            fireKey('Space');
-            return true;
-        }
-
         return false;
     }
 
     // ── Handle tap during GAMEPLAY ──
     function handlePlayTap(canvasX, canvasY) {
-        // Check finish-shift button
         if (mobileFinishBtnRect &&
             canvasX >= mobileFinishBtnRect.x && canvasX <= mobileFinishBtnRect.x + mobileFinishBtnRect.w &&
             canvasY >= mobileFinishBtnRect.y && canvasY <= mobileFinishBtnRect.y + mobileFinishBtnRect.h) {
-            fireKey('Escape');  // Triggers finish shift via inputActions.pause
+            fireKey('Escape');
             return true;
         }
-        // Otherwise tap = clean action
         fireKey('Space');
         return true;
     }
+
+    // ── Track the initial touch position for carousel drag detection ──
+    let touchOriginX = 0;
+    let touchOriginY = 0;
 
     canvas.addEventListener('touchstart', (e) => {
         e.preventDefault();
         const touch = e.touches[0];
         touchStartX = touch.clientX;
         touchStartY = touch.clientY;
+        touchOriginX = touch.clientX;
+        touchOriginY = touch.clientY;
         touchStartTime = Date.now();
         touchActive = true;
         touchSwiped = false;
+
+        // Begin carousel drag on charSelect
+        if (gameState.screen === 'charSelect') {
+            charCarousel.dragging = true;
+            charCarousel.dragStartX = touch.clientX;
+            charCarousel.dragStartOffset = charCarousel.offset;
+            charCarousel.lastDragX = touch.clientX;
+            charCarousel.lastDragTime = Date.now();
+            charCarousel.velocity = 0;
+        }
     }, { passive: false });
 
     canvas.addEventListener('touchmove', (e) => {
         e.preventDefault();
         if (!touchActive) return;
         const touch = e.touches[0];
+
+        // Character Select: direct carousel drag (horizontal)
+        if (gameState.screen === 'charSelect' && charCarousel.dragging) {
+            const rect = canvas.getBoundingClientRect();
+            const scale = canvas.width / rect.width;
+            const clientDx = touch.clientX - charCarousel.dragStartX;
+            const canvasDx = clientDx * scale;
+
+            charCarousel.offset = charCarousel.dragStartOffset - canvasDx;
+
+            // Clamp with rubber-band at edges
+            const maxOffset = (CHARACTERS.length - 1) * getCharCardSpacing();
+            if (charCarousel.offset < 0) {
+                charCarousel.offset *= 0.3; // rubber-band
+            } else if (charCarousel.offset > maxOffset) {
+                charCarousel.offset = maxOffset + (charCarousel.offset - maxOffset) * 0.3;
+            }
+
+            // Track velocity
+            const now = Date.now();
+            const timeDelta = now - charCarousel.lastDragTime;
+            if (timeDelta > 0) {
+                const velDx = (touch.clientX - charCarousel.lastDragX) * scale;
+                charCarousel.velocity = -velDx / (timeDelta / 1000);
+            }
+            charCarousel.lastDragX = touch.clientX;
+            charCarousel.lastDragTime = now;
+
+            // Track total movement for tap detection
+            const totalDx = touch.clientX - touchOriginX;
+            const totalDy = touch.clientY - touchOriginY;
+            if (Math.sqrt(totalDx * totalDx + totalDy * totalDy) > TAP_THRESHOLD) {
+                touchSwiped = true;
+            }
+            return;
+        }
+
         const dx = touch.clientX - touchStartX;
         const dy = touch.clientY - touchStartY;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -3995,15 +4238,12 @@ function initGame() {
             touchSwiped = true;
 
             if (gameState.screen === 'playing') {
-                // ── GAMEPLAY: set persistent touchDir for smooth movement ──
                 touchDir.x = (dir === 'left') ? -1 : (dir === 'right') ? 1 : 0;
                 touchDir.y = (dir === 'up')   ? -1 : (dir === 'down')  ? 1 : 0;
             } else {
-                // ── MENUS: fire one-shot directional input ──
                 handleMenuSwipe(dir);
             }
 
-            // Reset anchor for next drag step
             touchStartX = touch.clientX;
             touchStartY = touch.clientY;
         }
@@ -4014,17 +4254,31 @@ function initGame() {
         if (!touchActive) return;
         touchActive = false;
 
-        // Always clear persistent touch direction
         touchDir.x = 0;
         touchDir.y = 0;
 
+        // Finalize carousel drag
+        if (gameState.screen === 'charSelect' && charCarousel.dragging) {
+            charCarousel.dragging = false;
+            const cardSpacing = getCharCardSpacing();
+
+            // Determine snap target based on position + velocity
+            const velocityBoost = charCarousel.velocity * 0.15;
+            const projectedOffset = charCarousel.offset + velocityBoost;
+            let snapIdx = Math.round(projectedOffset / cardSpacing);
+            snapIdx = Math.max(0, Math.min(CHARACTERS.length - 1, snapIdx));
+
+            gameState._charIndex = snapIdx;
+            charCarousel.settled = false;
+            // velocity will be applied by spring physics in updateCharSelect
+        }
+
         const elapsed = Date.now() - touchStartTime;
         const touch = e.changedTouches[0];
-        const tdx = touch.clientX - touchStartX;
-        const tdy = touch.clientY - touchStartY;
+        const tdx = touch.clientX - touchOriginX;
+        const tdy = touch.clientY - touchOriginY;
         const dist = Math.sqrt(tdx * tdx + tdy * tdy);
 
-        // Tap detection: small movement + short duration + no swipe occurred
         if (dist < TAP_THRESHOLD && elapsed < 300 && !touchSwiped) {
             const c = clientToCanvas(touch.clientX, touch.clientY);
 
@@ -4053,7 +4307,7 @@ function loadProgress() {
             gameState.districtStars = data.districtStars || {};
             gameState.districtBests = data.districtBests || {};
             gameState.totalStars = data.totalStars || 0;
-            gameState.districtsUnlocked = data.districtsUnlocked || 1;
+            gameState.districtsUnlocked = 10;
             gameState.headlinesSeen = data.headlinesSeen || [];
             gameState.selectedCharacter = data.selectedCharacter || 0;
             gameState.cityGrade = calculateGrade(gameState.totalStars);
