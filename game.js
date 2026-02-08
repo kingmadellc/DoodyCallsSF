@@ -677,8 +677,8 @@ const HOLD_THRESHOLD = 150;
 
 const inputActions = {
     up: false, down: false, left: false, right: false,
-    action: false, pause: false, confirm: false,
-    _lastAction: false, _lastPause: false, _lastConfirm: false,
+    pause: false, confirm: false,
+    _lastPause: false, _lastConfirm: false,
 };
 
 function updateInputActions() {
@@ -704,12 +704,6 @@ function updateInputActions() {
     inputActions.down = shouldMove(['ArrowDown', 'KeyS', 'SwipeDown']);
     inputActions.left = shouldMove(['ArrowLeft', 'KeyA', 'SwipeLeft']);
     inputActions.right = shouldMove(['ArrowRight', 'KeyD', 'SwipeRight']);
-
-    // One-shot actions use buffered keys (survive fast tap/release)
-    const actionPressed = keys['Space'] || keys['KeyZ'] || keys['Enter'] ||
-                          keyBuffer['Space'] || keyBuffer['KeyZ'] || keyBuffer['Enter'];
-    inputActions.action = actionPressed && !inputActions._lastAction;
-    inputActions._lastAction = !!actionPressed;
 
     const pausePressed = keys['Escape'] || keys['KeyP'] ||
                          keyBuffer['Escape'] || keyBuffer['KeyP'];
@@ -1295,19 +1289,6 @@ function updatePlayer(dt) {
     const lerpSpeed = 12 * dt;
     p.visualX += (p.x - p.visualX) * Math.min(1, lerpSpeed);
     p.visualY += (p.y - p.visualY) * Math.min(1, lerpSpeed);
-
-    // Cleaning with action button (clean adjacent tile in facing direction)
-    if (inputActions.action) {
-        const dirs = [{x:0,y:1},{x:-1,y:0},{x:0,y:-1},{x:1,y:0}];
-        const d = dirs[p.direction];
-        const cx = p.x + d.x;
-        const cy = p.y + d.y;
-        if (cx >= 0 && cx < MAP_WIDTH && cy >= 0 && cy < MAP_HEIGHT) {
-            tryCleanTile(cx, cy);
-        }
-        // Also clean current tile
-        tryCleanTile(p.x, p.y);
-    }
 }
 
 function tryCleanTile(x, y) {
@@ -1335,17 +1316,7 @@ function tryCleanTile(x, y) {
             gameState.cleanState[y][x] = CLEAN_STATE.CLEAN;
             gameState.messesClean++;
             spawnCleanParticles(x, y, COLORS.uiClean);
-
-            // Sparkle bonus if you action-clean (not just walk over)
-            if (inputActions.action) {
-                gameState.cleanState[y][x] = CLEAN_STATE.SPARKLING;
-                spawnSparkleParticles(x, y);
-                addCelebration('+25', x, y, COLORS.uiGold);
-            } else {
-                addCelebration('+10', x, y, COLORS.uiClean);
-            }
-
-            // Check milestone
+            addCelebration('+10', x, y, COLORS.uiClean);
             checkCleanMilestones();
         }
     }
