@@ -445,7 +445,7 @@ const CHARACTERS = [
         abilityDesc: 'Wider visibility radius',
     },
     {
-        id: 'exec-producer', name: 'The Exec Producer', desc: 'Punk rock and PMing',
+        id: 'exec-producer', name: 'The Exec Producer', desc: 'Moshing by night, mopping by dawn',
         color: '#c0a020', visorColor: '#ffe060', ability: 'speed',
         abilityDesc: '+20% move speed',
     },
