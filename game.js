@@ -427,7 +427,7 @@ const CHARACTERS = [
         abilityDesc: 'Auto-clean is faster (skip DIRTY state)',
     },
     {
-        id: 'saas-accountant', name: 'The SaaS Accountant', desc: 'Reconciles messes like line items',
+        id: 'saas-exec', name: 'The SaaS Exec', desc: 'Reconciles messes like line items',
         color: '#2080b0', visorColor: '#40c0ff', ability: 'efficiency',
         abilityDesc: 'Cleaning earns +15% score bonus',
     },
@@ -472,7 +472,7 @@ const CHARACTERS = [
         abilityDesc: 'Auto-clean is faster (skip DIRTY state)',
     },
     {
-        id: 'vp-bizdev', name: 'The VP of Biz Dev', desc: 'Pitches synergies to every pigeon',
+        id: 'vp-bizdev', name: 'The VP of Biz Dev', desc: 'Oddly skilled with hammers',
         color: '#306080', visorColor: '#50a0c0', ability: 'speed',
         abilityDesc: '+20% move speed',
     },
