@@ -3493,20 +3493,12 @@ function drawGameOverScreen() {
     ctx.textAlign = 'center';
     wrapText(headline, cw / 2, ch * 0.44, cw * 0.85, 14);
 
-    // ── SHARE CARD ──
-    const shareW = cw * 0.80;
+    // ── SHARE CARD (with character emote + quip) ──
+    const shareW = cw * 0.86;
     const shareX = (cw - shareW) / 2;
-    const shareY = ch * 0.50;
-    const shareH = Math.floor(ch * 0.12);
+    const shareY = ch * 0.48;
+    const shareH = Math.floor(ch * 0.23);
     drawScoreShare(shareX, shareY, shareW, shareH, 0);
-
-    // ── HOBO QUOTE ──
-    const quoteY = shareY + shareH + Math.floor(ch * 0.012);
-    const btnTop = ch - 22 - Math.floor(ch * 0.13);
-    const quoteH = btnTop - quoteY - Math.floor(ch * 0.012);
-    if (quoteH > 30) {
-        drawHoboQuote(shareX, quoteY, shareW, quoteH);
-    }
 
     // ── BOTTOM BUTTONS ──
     const pad = Math.floor(cw * 0.03);
@@ -3653,20 +3645,12 @@ function drawDistrictCompleteScreen() {
         ctx.fillText('SO CLOSE...', cw / 2, rowY + 30);
     }
 
-    // ── SHARE CARD ──
-    const shareW = cw * 0.80;
+    // ── SHARE CARD (with character emote + quip) ──
+    const shareW = cw * 0.86;
     const shareX = (cw - shareW) / 2;
     const shareY = rowY + 42;
-    const shareH = Math.floor(ch * 0.11);
+    const shareH = Math.floor(ch * 0.23);
     drawScoreShare(shareX, shareY, shareW, shareH, stars);
-
-    // ── HOBO QUOTE ──
-    const btnTop = ch - 22 - Math.floor(ch * 0.13);
-    const quoteY = shareY + shareH + Math.floor(ch * 0.010);
-    const quoteH = btnTop - quoteY - Math.floor(ch * 0.010);
-    if (quoteH > 30) {
-        drawHoboQuote(shareX, quoteY, shareW, quoteH);
-    }
 
     // ── BOTTOM BUTTONS ──
     const pad = Math.floor(cw * 0.03);
@@ -3684,6 +3668,279 @@ function drawDistrictCompleteScreen() {
     ];
 
     drawEndScreenButtons(cardItems, pad, gap, gridW, cardH, gridTop, cornerR, cw);
+}
+
+// ============================================
+// CHARACTER EMOTE DRAWING (end screen celebrations)
+// ============================================
+// Emote types: 'victory' (arms up), 'facepalm' (hand on face), 'exhausted' (leaning),
+//              'flex' (muscle pose), 'broom_toss' (tossing broom)
+function drawCharEmote(cx, cy, sz, char, emote, t) {
+    const bodyW = sz * 0.45;
+    const bodyH = sz * 0.40;
+    const headW = sz * 0.32;
+    const headH = sz * 0.22;
+    const bootW = sz * 0.15;
+    const bootH = sz * 0.10;
+    const visorH = sz * 0.08;
+    const armW = sz * 0.10;
+    const armH = sz * 0.28;
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + sz * 0.42, bodyW * 0.7, sz * 0.06, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const bodyX = cx - bodyW / 2;
+    const bodyY = cy - bodyH / 2;
+    const headX = cx - headW / 2;
+    const headY = bodyY - headH + 2;
+
+    if (emote === 'victory') {
+        // Jumping character with arms up
+        const jump = Math.abs(Math.sin(t * 5)) * sz * 0.08;
+
+        // Body
+        ctx.fillStyle = char.color;
+        ctx.fillRect(bodyX, bodyY - jump, bodyW, bodyH);
+        // Head
+        ctx.fillRect(headX, headY - jump, headW, headH);
+        // Visor (happy angle)
+        ctx.fillStyle = char.visorColor;
+        ctx.fillRect(headX + 2, headY + headH * 0.3 - jump, headW - 4, visorH);
+
+        // Arms UP (victory V)
+        ctx.fillStyle = char.color;
+        ctx.save();
+        ctx.translate(bodyX - 2, bodyY + bodyH * 0.15 - jump);
+        ctx.rotate(-0.6 + Math.sin(t * 8) * 0.15);
+        ctx.fillRect(-armW, -armH, armW, armH);
+        ctx.restore();
+        ctx.save();
+        ctx.translate(bodyX + bodyW + 2, bodyY + bodyH * 0.15 - jump);
+        ctx.rotate(0.6 - Math.sin(t * 8) * 0.15);
+        ctx.fillRect(0, -armH, armW, armH);
+        ctx.restore();
+
+        // Boots
+        ctx.fillStyle = char.bootsColor || '#3a3a3a';
+        ctx.fillRect(bodyX + 2, bodyY + bodyH - jump, bootW, bootH);
+        ctx.fillRect(bodyX + bodyW - bootW - 2, bodyY + bodyH - jump, bootW, bootH);
+
+        // Sparkles around character
+        for (let i = 0; i < 5; i++) {
+            const angle = (t * 2 + i * 1.26) % (Math.PI * 2);
+            const dist = sz * 0.38 + Math.sin(t * 3 + i) * sz * 0.05;
+            const sx = cx + Math.cos(angle) * dist;
+            const sy = cy - sz * 0.1 + Math.sin(angle) * dist * 0.6;
+            const sparkAlpha = 0.4 + Math.sin(t * 5 + i * 2) * 0.3;
+            ctx.fillStyle = `rgba(255,220,80,${sparkAlpha})`;
+            ctx.fillRect(sx - 2, sy - 2, 4, 4);
+        }
+
+    } else if (emote === 'facepalm') {
+        // Standing with hand on visor
+        ctx.fillStyle = char.color;
+        ctx.fillRect(bodyX, bodyY, bodyW, bodyH);
+        ctx.fillRect(headX, headY, headW, headH);
+
+        // Visor (looking down)
+        ctx.fillStyle = char.visorColor;
+        ctx.fillRect(headX + 2, headY + headH * 0.5, headW - 4, visorH);
+
+        // Left arm normal
+        ctx.fillStyle = char.color;
+        ctx.fillRect(bodyX - armW - 1, bodyY + bodyH * 0.1, armW, armH * 0.8);
+
+        // Right arm on face (facepalm)
+        ctx.fillStyle = char.color;
+        ctx.fillRect(headX + headW * 0.3, headY + 2, armW, headH - 2);
+
+        // Boots
+        ctx.fillStyle = char.bootsColor || '#3a3a3a';
+        ctx.fillRect(bodyX + 2, bodyY + bodyH, bootW, bootH);
+        ctx.fillRect(bodyX + bodyW - bootW - 2, bodyY + bodyH, bootW, bootH);
+
+        // Sweat drops
+        const sweatAlpha = 0.3 + Math.sin(t * 4) * 0.2;
+        ctx.fillStyle = `rgba(100,180,255,${sweatAlpha})`;
+        const dropY = headY - 4 + ((t * 30) % 20);
+        ctx.fillRect(headX + headW + 4, dropY, 3, 5);
+
+    } else if (emote === 'exhausted') {
+        // Leaning on broom, panting
+        const sway = Math.sin(t * 2) * 2;
+
+        ctx.fillStyle = char.color;
+        ctx.fillRect(bodyX + sway, bodyY, bodyW, bodyH);
+        ctx.fillRect(headX + sway, headY, headW, headH);
+
+        // Visor (drooping)
+        ctx.fillStyle = char.visorColor;
+        ctx.fillRect(headX + 2 + sway, headY + headH * 0.4, headW - 4, visorH);
+
+        // Left arm on broom (leaning)
+        ctx.fillStyle = char.color;
+        ctx.fillRect(bodyX - armW + sway, bodyY + bodyH * 0.2, armW, armH * 0.6);
+
+        // Broom (leaning against)
+        ctx.fillStyle = '#8a6a3a';
+        ctx.save();
+        ctx.translate(bodyX - armW * 0.5 + sway, bodyY + bodyH * 0.7);
+        ctx.rotate(-0.15);
+        ctx.fillRect(-2, -sz * 0.35, 3, sz * 0.5);
+        ctx.fillStyle = '#c0a040';
+        ctx.fillRect(-5, sz * 0.12, 10, 5);
+        ctx.restore();
+
+        // Right arm hanging
+        ctx.fillStyle = char.color;
+        ctx.fillRect(bodyX + bodyW + 1 + sway, bodyY + bodyH * 0.2, armW, armH * 0.7);
+
+        // Boots
+        ctx.fillStyle = char.bootsColor || '#3a3a3a';
+        ctx.fillRect(bodyX + 2 + sway, bodyY + bodyH, bootW, bootH);
+        ctx.fillRect(bodyX + bodyW - bootW - 2 + sway, bodyY + bodyH, bootW, bootH);
+
+        // Panting breath clouds
+        const breathAlpha = 0.15 + Math.sin(t * 3) * 0.1;
+        ctx.fillStyle = `rgba(200,220,255,${breathAlpha})`;
+        const bx = headX + headW + 8 + sway;
+        const by = headY + headH * 0.3;
+        ctx.beginPath();
+        ctx.arc(bx + Math.sin(t * 2) * 3, by, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(bx + 8 + Math.sin(t * 2.5) * 2, by - 3, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+    } else if (emote === 'flex') {
+        // Muscle flex pose
+        const pump = Math.sin(t * 6) * 2;
+
+        ctx.fillStyle = char.color;
+        ctx.fillRect(bodyX, bodyY, bodyW, bodyH);
+        ctx.fillRect(headX, headY, headW, headH);
+
+        // Visor
+        ctx.fillStyle = char.visorColor;
+        ctx.fillRect(headX + 2, headY + headH * 0.35, headW - 4, visorH);
+
+        // Left arm flexed up
+        ctx.fillStyle = char.color;
+        ctx.save();
+        ctx.translate(bodyX, bodyY + bodyH * 0.15);
+        ctx.rotate(-1.2);
+        ctx.fillRect(-armW - 1, 0, armW + 1, armH * 0.7);
+        // Bicep bulge
+        ctx.fillRect(-armW - 4, -3 + pump, armW + 6, armH * 0.35);
+        ctx.restore();
+
+        // Right arm flexed up (mirror)
+        ctx.save();
+        ctx.translate(bodyX + bodyW, bodyY + bodyH * 0.15);
+        ctx.rotate(1.2);
+        ctx.fillRect(0, 0, armW + 1, armH * 0.7);
+        ctx.fillRect(-2, -3 - pump, armW + 6, armH * 0.35);
+        ctx.restore();
+
+        // Boots (wide stance)
+        ctx.fillStyle = char.bootsColor || '#3a3a3a';
+        ctx.fillRect(bodyX - 2, bodyY + bodyH, bootW, bootH);
+        ctx.fillRect(bodyX + bodyW - bootW + 2, bodyY + bodyH, bootW, bootH);
+
+    } else if (emote === 'broom_toss') {
+        // Character tossing broom in the air
+        ctx.fillStyle = char.color;
+        ctx.fillRect(bodyX, bodyY, bodyW, bodyH);
+        ctx.fillRect(headX, headY, headW, headH);
+
+        // Visor (looking up)
+        ctx.fillStyle = char.visorColor;
+        ctx.fillRect(headX + 2, headY + headH * 0.2, headW - 4, visorH);
+
+        // Arms reaching up
+        ctx.fillStyle = char.color;
+        ctx.save();
+        ctx.translate(bodyX + bodyW * 0.2, bodyY);
+        ctx.rotate(-0.3);
+        ctx.fillRect(-armW / 2, -armH * 0.8, armW, armH * 0.8);
+        ctx.restore();
+        ctx.save();
+        ctx.translate(bodyX + bodyW * 0.8, bodyY);
+        ctx.rotate(0.3);
+        ctx.fillRect(-armW / 2, -armH * 0.8, armW, armH * 0.8);
+        ctx.restore();
+
+        // Flying broom (spinning above)
+        const broomAngle = t * 8;
+        const broomFlyY = headY - sz * 0.25 + Math.sin(t * 3) * sz * 0.05;
+        ctx.save();
+        ctx.translate(cx, broomFlyY);
+        ctx.rotate(broomAngle);
+        ctx.fillStyle = '#8a6a3a';
+        ctx.fillRect(-sz * 0.15, -2, sz * 0.30, 3);
+        ctx.fillStyle = '#c0a040';
+        ctx.fillRect(sz * 0.12, -4, 6, 7);
+        ctx.restore();
+
+        // Boots
+        ctx.fillStyle = char.bootsColor || '#3a3a3a';
+        ctx.fillRect(bodyX + 2, bodyY + bodyH, bootW, bootH);
+        ctx.fillRect(bodyX + bodyW - bootW - 2, bodyY + bodyH, bootW, bootH);
+    }
+}
+
+// Pick emote based on performance
+function getEndScreenEmote(pct, stars, isGameOver) {
+    if (isGameOver) {
+        if (pct >= 50) return 'exhausted';
+        return 'facepalm';
+    }
+    if (stars >= 3) return 'broom_toss';
+    if (pct >= 90) return 'flex';
+    if (pct >= 60) return 'victory';
+    return 'exhausted';
+}
+
+// Fun quips based on performance (shown on share card)
+const SHARE_QUIPS = {
+    broom_toss: [
+        "I don't even need this broom anymore.",
+        "City so clean, the broom retired.",
+        "Threw my broom in the air like I just don't care.",
+        "Broom: YEETED. Streets: CLEANED.",
+    ],
+    flex: [
+        "These streets didn't stand a chance.",
+        "Poop? Needles? Never heard of 'em.",
+        "Professional street cleaner. Accept no substitutes.",
+        "Flexin' on filth since 5 AM.",
+    ],
+    victory: [
+        "The streets are mostly clean! Good enough!",
+        "San Francisco says... thanks, I guess?",
+        "Not bad for a pre-dawn shift.",
+        "The morning commuters will be slightly less disgusted.",
+    ],
+    exhausted: [
+        "I need a nap. And a shower. Mostly a shower.",
+        "The city won this round...",
+        "At least the pigeons respected my effort.",
+        "Gave it everything. Everything wasn't enough.",
+    ],
+    facepalm: [
+        "This shift never happened, okay?",
+        "I'm not even going to talk about it.",
+        "The streets won. I need coffee.",
+        "Let us never speak of this again.",
+    ],
+};
+
+function getShareQuip(emote, seed) {
+    const quips = SHARE_QUIPS[emote] || SHARE_QUIPS.exhausted;
+    return quips[Math.abs(seed) % quips.length];
 }
 
 function drawEndScreenButtons(cardItems, pad, gap, gridW, cardH, gridTop, cornerR, cw) {
@@ -3798,52 +4055,113 @@ function drawScoreShare(x, y, w, h, stars) {
     // Store hit rect for tap-to-share on mobile
     shareCardRect = { x, y, w, h };
 
-    // Share card background
-    ctx.fillStyle = 'rgba(255,255,255,0.05)';
-    ctx.beginPath();
-    ctx.roundRect(x, y, w, h, 6);
-    ctx.fill();
-    ctx.strokeStyle = gameState.scoreCopied ? '#4ecdc4' : 'rgba(255,255,255,0.1)';
-    ctx.lineWidth = gameState.scoreCopied ? 2 : 1;
-    ctx.beginPath();
-    ctx.roundRect(x, y, w, h, 6);
-    ctx.stroke();
-
+    const cw = canvas.width;
+    const t = animCache.time;
     const district = DISTRICTS[gameState.district];
     const pct = gameState.totalMesses > 0 ?
         Math.floor((gameState.messesClean / gameState.totalMesses) * 100) : 0;
     const char = CHARACTERS[gameState.selectedCharacter];
+    const isGameOver = gameState.screen === 'gameOver';
+    const emote = getEndScreenEmote(pct, stars, isGameOver);
+    const quipSeed = gameState.district * 13 + pct;
+    const quip = getShareQuip(emote, quipSeed);
 
-    ctx.fillStyle = '#888';
-    ctx.font = '9px monospace';
-    ctx.textAlign = 'left';
+    // Card background with subtle character-colored accent
+    const cardGrad = ctx.createLinearGradient(x, y, x + w, y + h);
+    cardGrad.addColorStop(0, 'rgba(255,255,255,0.06)');
+    cardGrad.addColorStop(1, `${char.color}15`);
+    ctx.fillStyle = cardGrad;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 8);
+    ctx.fill();
 
+    // Border (highlights when copied)
+    ctx.strokeStyle = gameState.scoreCopied ? '#4ecdc4' : `${char.color}40`;
+    ctx.lineWidth = gameState.scoreCopied ? 2 : 1;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 8);
+    ctx.stroke();
+
+    // ── Character emote (left side) ──
+    const emoteSize = Math.min(h * 0.75, w * 0.25);
+    const emoteCX = x + emoteSize * 0.75 + 12;
+    const emoteCY = y + h * 0.48;
+    drawCharEmote(emoteCX, emoteCY, emoteSize, char, emote, t);
+
+    // Emote label (small text below character)
+    ctx.fillStyle = `${char.color}88`;
+    ctx.font = `bold ${Math.floor(cw * 0.010)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(char.name.toUpperCase(), emoteCX, y + h - 8);
+
+    // ── Text content (right side) ──
+    const textX = emoteCX + emoteSize * 0.65 + 12;
+    const textW = x + w - textX - 10;
+
+    // Share CTA
     if (gameState.scoreCopied) {
         ctx.fillStyle = COLORS.uiAccent;
-        ctx.fillText('COPIED TO CLIPBOARD!', x + 8, y + 14);
-    } else if (isMobile) {
-        ctx.fillStyle = COLORS.uiAccent;
-        ctx.fillText('\u261D TAP HERE TO SHARE', x + 8, y + 14);
+        ctx.font = `bold ${Math.floor(cw * 0.016)}px monospace`;
+        ctx.textAlign = 'left';
+        ctx.fillText('\u2705 COPIED!', textX, y + 18);
     } else {
-        ctx.fillText('Press C to copy score & share:', x + 8, y + 14);
+        ctx.fillStyle = `${char.color}cc`;
+        ctx.font = `bold ${Math.floor(cw * 0.015)}px monospace`;
+        ctx.textAlign = 'left';
+        ctx.fillText(isMobile ? '\u261D TAP TO SHARE' : 'PRESS C TO SHARE', textX, y + 18);
     }
 
-    ctx.fillStyle = '#aaa';
-    ctx.font = '9px monospace';
-    const starStr = '\u2605'.repeat(stars) + '\u2606'.repeat(3 - stars);
-    ctx.fillText(`DOODY CALLS - D${district.id}: ${district.name}`, x + 8, y + 30);
-    const timeLeft = Math.floor(gameState.timeBonus);
-    ctx.fillText(`${starStr} | Cleaned: ${pct}% | Time: ${timeLeft}s left`, x + 8, y + 44);
-    const districtGrade = calculateDistrictGrade(pct, timeLeft);
-    ctx.fillText(`${char.name} | Grade: ${districtGrade}`, x + 8, y + 58);
+    // Quip (funny character quote)
+    ctx.fillStyle = 'rgba(255,255,255,0.72)';
+    ctx.font = `italic ${Math.floor(cw * 0.015)}px monospace`;
+    ctx.textAlign = 'left';
+    // Word wrap the quip
+    const quipWords = quip.split(' ');
+    let qLine = '\u201C';
+    let qLineY = y + 36;
+    const qMaxW = textW - 4;
+    const qLineH = Math.floor(cw * 0.020);
+    for (const word of quipWords) {
+        const test = qLine + word + ' ';
+        if (ctx.measureText(test).width > qMaxW && qLine !== '\u201C') {
+            ctx.fillText(qLine.trim(), textX, qLineY);
+            qLine = word + ' ';
+            qLineY += qLineH;
+        } else {
+            qLine = test;
+        }
+    }
+    ctx.fillText((qLine.trim() + '\u201D'), textX, qLineY);
 
-    // Near-miss or clutch indicator
+    // Divider line
+    const divY = Math.max(qLineY + qLineH + 4, y + h * 0.52);
+    ctx.strokeStyle = `${char.color}25`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(textX, divY);
+    ctx.lineTo(x + w - 10, divY);
+    ctx.stroke();
+
+    // Score details
+    const detailY = divY + 14;
+    ctx.fillStyle = '#bbb';
+    ctx.font = `${Math.floor(cw * 0.013)}px monospace`;
+    ctx.textAlign = 'left';
+    const starStr = '\u2605'.repeat(stars) + '\u2606'.repeat(3 - stars);
+    const timeLeft = Math.floor(gameState.timeBonus);
+    const districtGrade = calculateDistrictGrade(pct, timeLeft);
+    ctx.fillText(`${starStr} ${pct}% | ${districtGrade}`, textX, detailY);
+    ctx.fillText(`D${district.id}: ${district.name} | ${timeLeft}s left`, textX, detailY + 14);
+
+    // Clutch/near-miss badge
     if (gameState.clutchFinish) {
         ctx.fillStyle = '#ffdd44';
-        ctx.fillText('CLUTCH FINISH!', x + 8, y + 72);
+        ctx.font = `bold ${Math.floor(cw * 0.013)}px monospace`;
+        ctx.fillText('\u26A1 CLUTCH FINISH!', textX, detailY + 28);
     } else if (gameState.nearMiss) {
         ctx.fillStyle = '#ff8888';
-        ctx.fillText('SO CLOSE...', x + 8, y + 72);
+        ctx.font = `bold ${Math.floor(cw * 0.013)}px monospace`;
+        ctx.fillText('SO CLOSE...', textX, detailY + 28);
     }
 }
 
