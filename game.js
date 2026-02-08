@@ -147,10 +147,8 @@ const TILE = {
 const MESS = {
     NONE: 0,
     LITTER: 1,
-    PUDDLE: 2,
-    GRAFFITI: 3,
-    FOOD_WASTE: 4,
-    MYSTERY: 5,       // "mystery puddle"
+    POOP: 2,
+    NEEDLES: 3,
 };
 
 // Cleanliness state per tile
@@ -261,10 +259,10 @@ const COLORS = {
 
     // Mess colors (brightened for sunrise visibility)
     litterColor: '#e8d8b0',
-    puddleColor: '#8a7a50',
-    graffitiColors: ['#f05050', '#50b0f0', '#f0f050', '#c050f0'],
-    foodColor: '#e09848',
-    mysteryColor: '#8a7a38',
+    poopColor: '#6b4226',
+    poopHighlight: '#8b5e3c',
+    needleColor: '#c0c0c8',
+    needleTip: '#e84040',
 
     // UI
     uiBg: '#1a1a2e',
@@ -840,9 +838,9 @@ function generateCityBlock(districtIndex) {
         }
         tiles[7][6] = TILE.BUILDING_DOOR;
         // Pre-place food waste on piers
-        messes[5][1] = MESS.FOOD_WASTE; cleanState[5][1] = CLEAN_STATE.FILTHY;
-        messes[6][2] = MESS.FOOD_WASTE; cleanState[6][2] = CLEAN_STATE.DIRTY;
-        messes[5][21] = MESS.FOOD_WASTE; cleanState[5][21] = CLEAN_STATE.FILTHY;
+        messes[5][1] = MESS.POOP; cleanState[5][1] = CLEAN_STATE.FILTHY;
+        messes[6][2] = MESS.NEEDLES; cleanState[6][2] = CLEAN_STATE.DIRTY;
+        messes[5][21] = MESS.POOP; cleanState[5][21] = CLEAN_STATE.FILTHY;
         messes[7][22] = MESS.LITTER; cleanState[7][22] = CLEAN_STATE.DIRTY;
 
     } else if (districtIndex === 1) {
@@ -882,8 +880,8 @@ function generateCityBlock(districtIndex) {
             tiles[y][18] = TILE.ALLEY;
         }
         // Place "mystery puddle" in the alley
-        messes[6][17] = MESS.MYSTERY; cleanState[6][17] = CLEAN_STATE.FILTHY;
-        messes[7][17] = MESS.MYSTERY; cleanState[7][17] = CLEAN_STATE.FILTHY;
+        messes[6][17] = MESS.NEEDLES; cleanState[6][17] = CLEAN_STATE.FILTHY;
+        messes[7][17] = MESS.NEEDLES; cleanState[7][17] = CLEAN_STATE.FILTHY;
 
     } else if (districtIndex === 3) {
         // District 4: Russian Hill - hilltop park with trees
@@ -978,10 +976,10 @@ function generateCityBlock(districtIndex) {
             for (let x = 15; x < 18; x++) tiles[y][x] = TILE.SHOP_FRONT;
         }
         // Pre-place mystery puddles in vacant lot
-        messes[20][17] = MESS.MYSTERY; cleanState[20][17] = CLEAN_STATE.FILTHY;
-        messes[21][19] = MESS.MYSTERY; cleanState[21][19] = CLEAN_STATE.FILTHY;
-        messes[20][21] = MESS.MYSTERY; cleanState[20][21] = CLEAN_STATE.FILTHY;
-        messes[22][18] = MESS.MYSTERY; cleanState[22][18] = CLEAN_STATE.FILTHY;
+        messes[20][17] = MESS.POOP; cleanState[20][17] = CLEAN_STATE.FILTHY;
+        messes[21][19] = MESS.NEEDLES; cleanState[21][19] = CLEAN_STATE.FILTHY;
+        messes[20][21] = MESS.POOP; cleanState[20][21] = CLEAN_STATE.FILTHY;
+        messes[22][18] = MESS.NEEDLES; cleanState[22][18] = CLEAN_STATE.FILTHY;
 
     } else if (districtIndex === 7) {
         // District 8: Golden Gate Park - vast park with pond
@@ -1112,52 +1110,51 @@ function generateCityBlock(districtIndex) {
         if (isCleanableTile(tiles[y][x]) && messes[y][x] === MESS.NONE) {
             // Pick mess type based on tile and district
             if (tiles[y][x] === TILE.ALLEY) {
-                messes[y][x] = Math.random() < 0.4 ? MESS.MYSTERY : MESS.PUDDLE;
+                messes[y][x] = Math.random() < 0.5 ? MESS.NEEDLES : MESS.POOP;
             } else if (tiles[y][x] === TILE.PARK_GRASS) {
-                messes[y][x] = MESS.LITTER;
+                messes[y][x] = Math.random() < 0.8 ? MESS.POOP : MESS.LITTER;
             } else if (districtIndex === 0) {
-                // Fisherman's Wharf: more food waste
+                // Fisherman's Wharf: tourists leave litter, some poop
                 const roll = Math.random();
-                if (roll < 0.4) messes[y][x] = MESS.FOOD_WASTE;
-                else if (roll < 0.7) messes[y][x] = MESS.LITTER;
-                else messes[y][x] = MESS.PUDDLE;
+                if (roll < 0.45) messes[y][x] = MESS.LITTER;
+                else if (roll < 0.8) messes[y][x] = MESS.POOP;
+                else messes[y][x] = MESS.NEEDLES;
             } else if (districtIndex === 4) {
-                // Haight-Ashbury: more graffiti
+                // Haight-Ashbury: heavy needles
                 const roll = Math.random();
-                if (roll < 0.4) messes[y][x] = MESS.GRAFFITI;
-                else if (roll < 0.65) messes[y][x] = MESS.LITTER;
-                else if (roll < 0.85) messes[y][x] = MESS.PUDDLE;
-                else messes[y][x] = MESS.FOOD_WASTE;
+                if (roll < 0.45) messes[y][x] = MESS.NEEDLES;
+                else if (roll < 0.7) messes[y][x] = MESS.POOP;
+                else messes[y][x] = MESS.LITTER;
             } else if (districtIndex === 5) {
-                // Mission: more food waste
+                // Mission: mixed mess
                 const roll = Math.random();
-                if (roll < 0.4) messes[y][x] = MESS.FOOD_WASTE;
-                else if (roll < 0.6) messes[y][x] = MESS.LITTER;
-                else if (roll < 0.8) messes[y][x] = MESS.GRAFFITI;
-                else messes[y][x] = MESS.PUDDLE;
+                if (roll < 0.35) messes[y][x] = MESS.POOP;
+                else if (roll < 0.65) messes[y][x] = MESS.LITTER;
+                else messes[y][x] = MESS.NEEDLES;
             } else if (districtIndex === 6) {
-                // Tenderloin: heavy mystery + puddle
+                // Tenderloin: heavy poop + needles
                 const roll = Math.random();
-                if (roll < 0.35) messes[y][x] = MESS.MYSTERY;
-                else if (roll < 0.65) messes[y][x] = MESS.PUDDLE;
-                else if (roll < 0.85) messes[y][x] = MESS.LITTER;
-                else messes[y][x] = MESS.FOOD_WASTE;
+                if (roll < 0.4) messes[y][x] = MESS.POOP;
+                else if (roll < 0.75) messes[y][x] = MESS.NEEDLES;
+                else messes[y][x] = MESS.LITTER;
             } else if (districtIndex === 7) {
-                // Golden Gate Park: mostly litter, some puddle
-                messes[y][x] = Math.random() < 0.7 ? MESS.LITTER : MESS.PUDDLE;
+                // Golden Gate Park: mostly poop (dogs), some litter
+                const roll = Math.random();
+                if (roll < 0.5) messes[y][x] = MESS.POOP;
+                else if (roll < 0.85) messes[y][x] = MESS.LITTER;
+                else messes[y][x] = MESS.NEEDLES;
             } else if (districtIndex === 8) {
-                // Chinatown: litter + food waste
+                // Chinatown: litter heavy, some poop
                 const roll = Math.random();
-                if (roll < 0.35) messes[y][x] = MESS.LITTER;
-                else if (roll < 0.65) messes[y][x] = MESS.FOOD_WASTE;
-                else if (roll < 0.85) messes[y][x] = MESS.PUDDLE;
-                else messes[y][x] = MESS.GRAFFITI;
+                if (roll < 0.45) messes[y][x] = MESS.LITTER;
+                else if (roll < 0.8) messes[y][x] = MESS.POOP;
+                else messes[y][x] = MESS.NEEDLES;
             } else {
+                // Default distribution
                 const roll = Math.random();
                 if (roll < 0.35) messes[y][x] = MESS.LITTER;
-                else if (roll < 0.6) messes[y][x] = MESS.PUDDLE;
-                else if (roll < 0.8) messes[y][x] = MESS.FOOD_WASTE;
-                else messes[y][x] = MESS.GRAFFITI;
+                else if (roll < 0.65) messes[y][x] = MESS.POOP;
+                else messes[y][x] = MESS.NEEDLES;
             }
             cleanState[y][x] = Math.random() < 0.4 ? CLEAN_STATE.FILTHY : CLEAN_STATE.DIRTY;
             placed++;
@@ -1490,7 +1487,7 @@ function pigeonBomb(cx, cy) {
                 }
                 // Add mess if there wasn't one
                 if (gameState.messes[y][x] === MESS.NONE) {
-                    gameState.messes[y][x] = MESS.PUDDLE;
+                    gameState.messes[y][x] = MESS.POOP;
                     gameState.cleanState[y][x] = CLEAN_STATE.DIRTY;
                     gameState.totalMesses++;
                 }
@@ -1621,7 +1618,7 @@ function hoboPoop(cx, cy) {
             gameState.cleanState[cy][cx] = CLEAN_STATE.FILTHY;
         }
         if (gameState.messes[cy][cx] === MESS.NONE) {
-            gameState.messes[cy][cx] = MESS.MYSTERY;
+            gameState.messes[cy][cx] = MESS.POOP;
             gameState.cleanState[cy][cx] = CLEAN_STATE.FILTHY;
             gameState.totalMesses++;
         } else {
@@ -2490,63 +2487,71 @@ function drawTile(x, y) {
                 ctx.fillRect(sx + 16, sy + 14, 6, 2);
                 break;
 
-            case MESS.PUDDLE:
-                // Sunrise reflection makes puddles catch warm light
-                ctx.fillStyle = COLORS.puddleColor;
+            case MESS.POOP:
+                // Brown mound with highlight and stink lines
+                ctx.fillStyle = COLORS.poopColor;
+                // Base mound
                 ctx.beginPath();
-                ctx.ellipse(sx + TILE_SIZE / 2, sy + TILE_SIZE / 2,
-                    TILE_SIZE / 3, TILE_SIZE / 4, 0, 0, Math.PI * 2);
+                ctx.ellipse(sx + TILE_SIZE / 2, sy + TILE_SIZE / 2 + 3,
+                    TILE_SIZE / 3, TILE_SIZE / 4.5, 0, 0, Math.PI * 2);
                 ctx.fill();
-                // Warm sunrise reflection highlight
-                ctx.fillStyle = 'rgba(255,180,100,0.35)';
+                // Top coil
                 ctx.beginPath();
-                ctx.ellipse(sx + TILE_SIZE / 2 - 2, sy + TILE_SIZE / 2 - 2,
-                    TILE_SIZE / 5, TILE_SIZE / 6, 0, 0, Math.PI * 2);
+                ctx.ellipse(sx + TILE_SIZE / 2, sy + TILE_SIZE / 2 - 2,
+                    TILE_SIZE / 4.5, TILE_SIZE / 5, 0, 0, Math.PI * 2);
                 ctx.fill();
-                break;
-
-            case MESS.GRAFFITI:
-                const gColor = COLORS.graffitiColors[(x * 3 + y * 7) % COLORS.graffitiColors.length];
-                ctx.fillStyle = gColor;
-                ctx.fillRect(sx + 2, sy + 6, TILE_SIZE - 4, 3);
-                ctx.fillRect(sx + 6, sy + 2, 3, TILE_SIZE - 4);
-                ctx.fillRect(sx + 14, sy + 10, 8, 3);
-                break;
-
-            case MESS.FOOD_WASTE:
-                ctx.fillStyle = COLORS.foodColor;
-                ctx.fillRect(sx + 6, sy + 8, 12, 10);
-                ctx.fillStyle = '#c07838';
-                ctx.fillRect(sx + 14, sy + 6, 8, 6);
-                // Wrapper highlight
-                ctx.fillStyle = '#f0d090';
-                ctx.fillRect(sx + 6, sy + 8, 12, 2);
-                break;
-
-            case MESS.MYSTERY:
-                // "Mystery puddle" - extra gross, more visible
-                ctx.fillStyle = COLORS.mysteryColor;
+                // Tip
                 ctx.beginPath();
-                ctx.ellipse(sx + TILE_SIZE / 2, sy + TILE_SIZE / 2,
-                    TILE_SIZE / 2.5, TILE_SIZE / 3, 0, 0, Math.PI * 2);
+                ctx.ellipse(sx + TILE_SIZE / 2 + 1, sy + TILE_SIZE / 2 - 6,
+                    TILE_SIZE / 7, TILE_SIZE / 8, 0, 0, Math.PI * 2);
                 ctx.fill();
-                // Darker center for depth
-                ctx.fillStyle = 'rgba(80,60,20,0.4)';
-                ctx.beginPath();
-                ctx.ellipse(sx + TILE_SIZE / 2, sy + TILE_SIZE / 2 + 1,
-                    TILE_SIZE / 4, TILE_SIZE / 5, 0, 0, Math.PI * 2);
-                ctx.fill();
-                // Stink lines (brighter yellow-green)
-                ctx.strokeStyle = '#b0a050';
+                // Highlight
+                ctx.fillStyle = COLORS.poopHighlight;
+                ctx.fillRect(sx + 10, sy + 10, 3, 2);
+                ctx.fillRect(sx + 12, sy + 6, 2, 2);
+                // Stink lines (wavy green)
+                ctx.strokeStyle = '#8a9a40';
                 ctx.lineWidth = 1;
                 for (let i = 0; i < 3; i++) {
-                    const wx = sx + 8 + i * 8;
-                    const sway = Math.sin(animCache.time * 3 + i * 2) * 3;
+                    const wx = sx + 7 + i * 7;
+                    const sway = Math.sin(animCache.time * 3 + i * 2.5) * 3;
                     ctx.beginPath();
                     ctx.moveTo(wx + sway, sy + 4);
-                    ctx.lineTo(wx - sway, sy - 4);
+                    ctx.lineTo(wx - sway, sy - 3);
                     ctx.stroke();
                 }
+                break;
+
+            case MESS.NEEDLES:
+                // Scattered syringes — 2-3 needles at angles
+                ctx.strokeStyle = COLORS.needleColor;
+                ctx.lineWidth = 2;
+                // Needle 1 (diagonal)
+                ctx.beginPath();
+                ctx.moveTo(sx + 4, sy + 18);
+                ctx.lineTo(sx + 18, sy + 8);
+                ctx.stroke();
+                // Red tip
+                ctx.fillStyle = COLORS.needleTip;
+                ctx.fillRect(sx + 3, sy + 17, 3, 3);
+                // Plunger end
+                ctx.fillStyle = '#a0a0a8';
+                ctx.fillRect(sx + 17, sy + 7, 3, 3);
+
+                // Needle 2 (more horizontal)
+                ctx.strokeStyle = COLORS.needleColor;
+                ctx.beginPath();
+                ctx.moveTo(sx + 10, sy + 22);
+                ctx.lineTo(sx + 24, sy + 18);
+                ctx.stroke();
+                ctx.fillStyle = COLORS.needleTip;
+                ctx.fillRect(sx + 9, sy + 21, 2, 2);
+                ctx.fillStyle = '#a0a0a8';
+                ctx.fillRect(sx + 23, sy + 17, 2, 2);
+
+                // Orange cap (discarded)
+                ctx.fillStyle = '#e08030';
+                ctx.fillRect(sx + 16, sy + 14, 3, 2);
                 break;
         }
 
@@ -3195,18 +3200,13 @@ function drawTitleScreen() {
         ctx.fillText('San Francisco needs you before they wake up.', cw / 2, logoY + logoH + taglineGap + taglineFontSize * 0.5);
         ctx.globalAlpha = 1;
     } else {
-        const titleFontSize = Math.floor(cw * 0.09);
-        const totalBlockH = titleFontSize + taglineGap + taglineFontSize;
-        const titleY = (gridTop - totalBlockH) / 2 + titleFontSize;
-        ctx.fillStyle = '#ff8040';
-        ctx.font = `bold ${titleFontSize}px monospace`;
-        ctx.textAlign = 'center';
-        ctx.fillText('DOODY CALLS', cw / 2, titleY);
-
+        // Wordmark not loaded — show tagline only (no fallback title)
+        const tagY = gridTop / 2 + taglineFontSize * 0.5;
         ctx.globalAlpha = 0.85;
         ctx.fillStyle = '#4ecdc4';
         ctx.font = `${taglineFontSize}px monospace`;
-        ctx.fillText('San Francisco needs you before they wake up.', cw / 2, titleY + taglineGap + taglineFontSize);
+        ctx.textAlign = 'center';
+        ctx.fillText('San Francisco needs you before they wake up.', cw / 2, tagY);
         ctx.globalAlpha = 1;
     }
     const gridLeft = pad;
