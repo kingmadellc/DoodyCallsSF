@@ -3872,127 +3872,203 @@ function drawDailyResultScreen() {
     ctx.fillStyle = '#ff6b9d';
     ctx.font = `bold ${Math.floor(cw * 0.05)}px monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText('\u{1F4C5} DAILY DISTRICT', cw / 2, ch * 0.12);
+    ctx.fillText('\u{1F4C5} DAILY DISTRICT', cw / 2, ch * 0.10);
 
     ctx.fillStyle = COLORS.uiAccent;
-    ctx.font = `${Math.floor(cw * 0.024)}px monospace`;
-    ctx.fillText(dailyDist.name, cw / 2, ch * 0.18);
-
-    if (!r) {
-        // No result saved (shouldn't happen, but graceful fallback)
-        ctx.fillStyle = '#888';
-        ctx.font = `${Math.floor(cw * 0.022)}px monospace`;
-        ctx.fillText('Already completed today!', cw / 2, ch * 0.35);
-        ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = `${Math.floor(cw * 0.018)}px monospace`;
-        ctx.fillText('New daily unlocks at 5:00 AM PST', cw / 2, ch * 0.42);
-        ctx.fillText('Tap or press any key to go back', cw / 2, ch * 0.88);
-        return;
-    }
+    ctx.font = `${Math.floor(cw * 0.022)}px monospace`;
+    ctx.fillText(dailyDist.name, cw / 2, ch * 0.16);
 
     // "COMPLETED" badge
     ctx.fillStyle = 'rgba(78,205,196,0.12)';
     ctx.beginPath();
-    ctx.roundRect(cw * 0.25, ch * 0.22, cw * 0.5, ch * 0.05, 20);
+    ctx.roundRect(cw * 0.25, ch * 0.20, cw * 0.5, ch * 0.045, 20);
     ctx.fill();
     ctx.fillStyle = COLORS.uiAccent;
-    ctx.font = `bold ${Math.floor(cw * 0.018)}px monospace`;
-    ctx.fillText('\u2705 COMPLETED', cw / 2, ch * 0.255);
+    ctx.font = `bold ${Math.floor(cw * 0.017)}px monospace`;
+    ctx.fillText('\u2705 COMPLETED', cw / 2, ch * 0.23);
 
-    // Stars
-    const starSize = Math.floor(cw * 0.07);
-    const starSpacing = Math.floor(starSize * 1.5);
-    const starsY = ch * 0.34;
-    for (let i = 0; i < 3; i++) {
-        const filled = i < r.stars;
-        ctx.fillStyle = filled ? COLORS.uiGold : '#333';
-        ctx.font = `${starSize}px monospace`;
+    if (r) {
+        // ── Full result with stats ──
+
+        // Stars
+        const starSize = Math.floor(cw * 0.065);
+        const starSpacing = Math.floor(starSize * 1.5);
+        const starsY = ch * 0.30;
+        for (let i = 0; i < 3; i++) {
+            const filled = i < r.stars;
+            ctx.fillStyle = filled ? COLORS.uiGold : '#333';
+            ctx.font = `${starSize}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.fillText(filled ? '\u2605' : '\u2606', cw / 2 - starSpacing + i * starSpacing, starsY);
+        }
+
+        // Stats card
+        const statsW = cw * 0.82;
+        const statsH = Math.floor(ch * 0.20);
+        const statsX = (cw - statsW) / 2;
+        const statsY = ch * 0.35;
+        ctx.fillStyle = 'rgba(255,255,255,0.05)';
+        ctx.beginPath();
+        ctx.roundRect(statsX, statsY, statsW, statsH, 8);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(statsX, statsY, statsW, statsH, 8);
+        ctx.stroke();
+
+        // Cleaned %
+        const pctColor = r.pct >= 100 ? COLORS.uiGold : r.pct >= 60 ? COLORS.uiAccent : '#ff6b6b';
+        ctx.fillStyle = pctColor;
+        ctx.font = `bold ${Math.floor(cw * 0.05)}px monospace`;
         ctx.textAlign = 'center';
-        ctx.fillText(filled ? '\u2605' : '\u2606', cw / 2 - starSpacing + i * starSpacing, starsY);
-    }
+        ctx.fillText(`${r.pct}%`, cw / 2, statsY + statsH * 0.25);
+        ctx.fillStyle = '#888';
+        ctx.font = `${Math.floor(cw * 0.016)}px monospace`;
+        ctx.fillText('CLEANED', cw / 2, statsY + statsH * 0.37);
 
-    // Stats card
-    const statsW = cw * 0.80;
-    const statsH = Math.floor(ch * 0.22);
-    const statsX = (cw - statsW) / 2;
-    const statsY = ch * 0.40;
-    ctx.fillStyle = 'rgba(255,255,255,0.05)';
-    ctx.beginPath();
-    ctx.roundRect(statsX, statsY, statsW, statsH, 8);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(statsX, statsY, statsW, statsH, 8);
-    ctx.stroke();
+        // Divider
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        ctx.beginPath();
+        ctx.moveTo(statsX + 20, statsY + statsH * 0.45);
+        ctx.lineTo(statsX + statsW - 20, statsY + statsH * 0.45);
+        ctx.stroke();
 
-    // Cleaned %
-    const pctColor = r.pct >= 100 ? COLORS.uiGold : r.pct >= 60 ? COLORS.uiAccent : '#ff6b6b';
-    ctx.fillStyle = pctColor;
-    ctx.font = `bold ${Math.floor(cw * 0.055)}px monospace`;
-    ctx.textAlign = 'center';
-    ctx.fillText(`${r.pct}%`, cw / 2, statsY + statsH * 0.28);
-    ctx.fillStyle = '#888';
-    ctx.font = `${Math.floor(cw * 0.018)}px monospace`;
-    ctx.fillText('CLEANED', cw / 2, statsY + statsH * 0.40);
+        // Stats row
+        ctx.textAlign = 'center';
 
-    // Divider
-    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-    ctx.beginPath();
-    ctx.moveTo(statsX + 20, statsY + statsH * 0.48);
-    ctx.lineTo(statsX + statsW - 20, statsY + statsH * 0.48);
-    ctx.stroke();
+        // Grade
+        ctx.fillStyle = COLORS.uiAccent;
+        ctx.font = `bold ${Math.floor(cw * 0.028)}px monospace`;
+        ctx.fillText(r.grade, cw / 2 - cw * 0.18, statsY + statsH * 0.62);
+        ctx.fillStyle = '#666';
+        ctx.font = `${Math.floor(cw * 0.012)}px monospace`;
+        ctx.fillText('GRADE', cw / 2 - cw * 0.18, statsY + statsH * 0.72);
 
-    // Stats row
-    ctx.font = `${Math.floor(cw * 0.017)}px monospace`;
-    ctx.textAlign = 'center';
+        // Time
+        ctx.fillStyle = '#ccc';
+        ctx.font = `bold ${Math.floor(cw * 0.028)}px monospace`;
+        ctx.fillText(`${r.timeLeft}s`, cw / 2, statsY + statsH * 0.62);
+        ctx.fillStyle = '#666';
+        ctx.font = `${Math.floor(cw * 0.012)}px monospace`;
+        ctx.fillText('TIME LEFT', cw / 2, statsY + statsH * 0.72);
 
-    // Grade
-    ctx.fillStyle = COLORS.uiAccent;
-    ctx.font = `bold ${Math.floor(cw * 0.03)}px monospace`;
-    ctx.fillText(r.grade, cw / 2 - cw * 0.18, statsY + statsH * 0.65);
-    ctx.fillStyle = '#666';
-    ctx.font = `${Math.floor(cw * 0.013)}px monospace`;
-    ctx.fillText('GRADE', cw / 2 - cw * 0.18, statsY + statsH * 0.75);
+        // Character
+        ctx.fillStyle = '#ccc';
+        ctx.font = `bold ${Math.floor(cw * 0.017)}px monospace`;
+        ctx.fillText(r.charName, cw / 2 + cw * 0.18, statsY + statsH * 0.62);
+        ctx.fillStyle = '#666';
+        ctx.font = `${Math.floor(cw * 0.012)}px monospace`;
+        ctx.fillText('WORKER', cw / 2 + cw * 0.18, statsY + statsH * 0.72);
 
-    // Time
-    ctx.fillStyle = '#ccc';
-    ctx.font = `bold ${Math.floor(cw * 0.03)}px monospace`;
-    ctx.fillText(`${r.timeLeft}s`, cw / 2, statsY + statsH * 0.65);
-    ctx.fillStyle = '#666';
-    ctx.font = `${Math.floor(cw * 0.013)}px monospace`;
-    ctx.fillText('TIME LEFT', cw / 2, statsY + statsH * 0.75);
+        // Clutch / near miss badge
+        if (r.clutch) {
+            ctx.fillStyle = '#ffdd44';
+            ctx.font = `bold ${Math.floor(cw * 0.015)}px monospace`;
+            ctx.fillText('\u26A1 CLUTCH FINISH!', cw / 2, statsY + statsH * 0.87);
+        } else if (r.nearMiss) {
+            ctx.fillStyle = '#ff8888';
+            ctx.font = `bold ${Math.floor(cw * 0.015)}px monospace`;
+            ctx.fillText('SO CLOSE...', cw / 2, statsY + statsH * 0.87);
+        }
 
-    // Character
-    ctx.fillStyle = '#ccc';
-    ctx.font = `bold ${Math.floor(cw * 0.018)}px monospace`;
-    ctx.fillText(r.charName, cw / 2 + cw * 0.18, statsY + statsH * 0.65);
-    ctx.fillStyle = '#666';
-    ctx.font = `${Math.floor(cw * 0.013)}px monospace`;
-    ctx.fillText('WORKER', cw / 2 + cw * 0.18, statsY + statsH * 0.75);
+        // ── Share card (drawn from saved scoreText) ──
+        const shareW = statsW;
+        const shareH = Math.floor(ch * 0.13);
+        const shareX = statsX;
+        const shareYPos = statsY + statsH + Math.floor(ch * 0.02);
+        drawDailyShareCard(shareX, shareYPos, shareW, shareH, r);
 
-    // Clutch / near miss badge
-    if (r.clutch) {
-        ctx.fillStyle = '#ffdd44';
-        ctx.font = `bold ${Math.floor(cw * 0.016)}px monospace`;
-        ctx.fillText('\u26A1 CLUTCH FINISH!', cw / 2, statsY + statsH * 0.90);
-    } else if (r.nearMiss) {
-        ctx.fillStyle = '#ff8888';
-        ctx.font = `bold ${Math.floor(cw * 0.016)}px monospace`;
-        ctx.fillText('SO CLOSE...', cw / 2, statsY + statsH * 0.90);
+    } else {
+        // ── No saved result (played before the update) ──
+        // Try to reconstruct from districtBests
+        const distId = dailyDist.id;
+        const best = gameState.districtBests[distId];
+
+        if (best) {
+            ctx.fillStyle = '#ccc';
+            ctx.font = `bold ${Math.floor(cw * 0.04)}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.fillText(`${best.pct}%`, cw / 2, ch * 0.38);
+            ctx.fillStyle = '#888';
+            ctx.font = `${Math.floor(cw * 0.016)}px monospace`;
+            ctx.fillText('BEST SCORE', cw / 2, ch * 0.42);
+        } else {
+            ctx.fillStyle = '#888';
+            ctx.font = `${Math.floor(cw * 0.020)}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.fillText('Already completed today!', cw / 2, ch * 0.38);
+        }
+
+        // Still clear the shareCardRect so no stale hits
+        shareCardRect = null;
     }
 
     // Next daily countdown
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.font = `${Math.floor(cw * 0.016)}px monospace`;
+    ctx.font = `${Math.floor(cw * 0.015)}px monospace`;
     ctx.textAlign = 'center';
     const nextReset = getNextDailyReset();
-    ctx.fillText(`New daily in ${nextReset}`, cw / 2, ch * 0.72);
+    ctx.fillText(`New daily in ${nextReset}`, cw / 2, ch * 0.82);
 
     // Back hint
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    ctx.font = `${Math.floor(cw * 0.015)}px monospace`;
+    ctx.font = `${Math.floor(cw * 0.014)}px monospace`;
     ctx.fillText(isMobile ? 'Tap anywhere to go back' : 'Press any key to go back', cw / 2, ch * 0.92);
+}
+
+function drawDailyShareCard(x, y, w, h, r) {
+    // Store hit rect for tap-to-share
+    shareCardRect = { x, y, w, h };
+
+    // Card background
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 6);
+    ctx.fill();
+    ctx.strokeStyle = gameState.scoreCopied ? '#4ecdc4' : 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = gameState.scoreCopied ? 2 : 1;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 6);
+    ctx.stroke();
+
+    const cw = canvas.width;
+    ctx.textAlign = 'left';
+
+    // Header line
+    if (gameState.scoreCopied) {
+        ctx.fillStyle = COLORS.uiAccent;
+        ctx.font = `bold 9px monospace`;
+        ctx.fillText('COPIED TO CLIPBOARD!', x + 8, y + 14);
+    } else if (isMobile) {
+        ctx.fillStyle = COLORS.uiAccent;
+        ctx.font = `bold 9px monospace`;
+        ctx.fillText('\u261D TAP HERE TO SHARE', x + 8, y + 14);
+    } else {
+        ctx.fillStyle = '#888';
+        ctx.font = '9px monospace';
+        ctx.fillText('Press C to copy score & share:', x + 8, y + 14);
+    }
+
+    // Score text preview (from saved scoreText)
+    if (r.scoreText) {
+        ctx.fillStyle = '#aaa';
+        ctx.font = '9px monospace';
+        const lines = r.scoreText.split('\n');
+        let lineY = y + 28;
+        for (let i = 0; i < Math.min(lines.length, 4); i++) {
+            ctx.fillText(lines[i], x + 8, lineY);
+            lineY += 14;
+        }
+    } else {
+        // Reconstruct a basic score line
+        ctx.fillStyle = '#aaa';
+        ctx.font = '9px monospace';
+        const starStr = '\u2605'.repeat(r.stars) + '\u2606'.repeat(3 - r.stars);
+        ctx.fillText(`DOODY CALLS - Daily: ${r.districtName}`, x + 8, y + 28);
+        ctx.fillText(`${starStr} | Cleaned: ${r.pct}% | Grade: ${r.grade}`, x + 8, y + 42);
+        ctx.fillText(`${r.charName} | Time: ${r.timeLeft}s left`, x + 8, y + 56);
+    }
 }
 
 function getNextDailyReset() {
@@ -4452,8 +4528,12 @@ function update(dt) {
             if (rect) executeEndScreenAction(rect.action);
         }
     } else if (gameState.screen === 'dailyResult') {
-        // Any key returns to title
-        if (inputActions.confirm || inputActions.pause) {
+        // C key to copy score
+        if (keys['KeyC'] || keyBuffer['KeyC']) {
+            shareScore();
+        }
+        // Any other key returns to title
+        else if (inputActions.confirm || inputActions.pause) {
             gameState.screen = 'title';
         }
     } else if (gameState.screen === 'charSelect') {
@@ -4488,6 +4568,11 @@ function titleMenuSelect(idx) {
     } else if (idx === 3) {
         // Daily District — only once per day unless admin
         if (gameState.dailyPlayed && !IS_ADMIN) {
+            // Load saved score text for sharing
+            if (gameState.dailyResult && gameState.dailyResult.scoreText) {
+                gameState.lastScoreText = gameState.dailyResult.scoreText;
+            }
+            gameState.scoreCopied = false;
             gameState.screen = 'dailyResult';
             return;
         }
@@ -4953,8 +5038,14 @@ function initGame() {
             return false;
         }
 
-        // Daily Result: tap anywhere to go back
+        // Daily Result: share card tap, or tap anywhere else to go back
         if (screen === 'dailyResult') {
+            if (shareCardRect &&
+                canvasX >= shareCardRect.x && canvasX <= shareCardRect.x + shareCardRect.w &&
+                canvasY >= shareCardRect.y && canvasY <= shareCardRect.y + shareCardRect.h) {
+                shareScore();
+                return true;
+            }
             gameState.screen = 'title';
             return true;
         }
@@ -5188,6 +5279,13 @@ function initGame() {
         } else if (gameState.screen === 'paused') {
             handlePauseTap(c.x, c.y);
         } else if (gameState.screen === 'dailyResult') {
+            // Share card click
+            if (shareCardRect &&
+                c.x >= shareCardRect.x && c.x <= shareCardRect.x + shareCardRect.w &&
+                c.y >= shareCardRect.y && c.y <= shareCardRect.y + shareCardRect.h) {
+                shareScore();
+                return;
+            }
             gameState.screen = 'title';
             return;
         } else if (gameState.screen === 'gameOver' || gameState.screen === 'districtComplete') {
