@@ -3494,25 +3494,25 @@ function drawGameOverScreen() {
 
     // Title
     ctx.fillStyle = '#ff4444';
-    ctx.font = `bold ${Math.floor(cw * 0.065)}px monospace`;
+    ctx.font = `bold ${Math.floor(cw * 0.055)}px monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText('SHIFT OVER', cw / 2, ch * 0.18);
+    ctx.fillText('SHIFT OVER', cw / 2, ch * 0.14);
 
     // District name
     ctx.fillStyle = '#ff8888';
-    ctx.font = `${Math.floor(cw * 0.025)}px monospace`;
-    ctx.fillText(district.name, cw / 2, ch * 0.25);
+    ctx.font = `${Math.floor(cw * 0.022)}px monospace`;
+    ctx.fillText(district.name, cw / 2, ch * 0.20);
 
     // Headline
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.font = `${Math.floor(cw * 0.018)}px monospace`;
-    wrapText(headline, cw / 2, ch * 0.32, cw * 0.8, 16);
+    ctx.font = `${Math.floor(cw * 0.016)}px monospace`;
+    wrapText(headline, cw / 2, ch * 0.26, cw * 0.8, 14);
 
     // Stats card
-    const statsW = cw * 0.75;
-    const statsH = Math.floor(ch * 0.09);
+    const statsW = cw * 0.80;
+    const statsH = Math.floor(ch * 0.07);
     const statsX = (cw - statsW) / 2;
-    const statsY = ch * 0.40;
+    const statsY = ch * 0.32;
     ctx.fillStyle = 'rgba(255,255,255,0.05)';
     ctx.beginPath();
     ctx.roundRect(statsX, statsY, statsW, statsH, 6);
@@ -3524,15 +3524,24 @@ function drawGameOverScreen() {
     ctx.stroke();
 
     ctx.fillStyle = '#ccc';
-    ctx.font = `bold ${Math.floor(cw * 0.028)}px monospace`;
+    ctx.font = `bold ${Math.floor(cw * 0.026)}px monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText(`${pct}% CLEANED`, cw / 2, statsY + statsH * 0.42);
+    ctx.fillText(`${pct}% CLEANED`, cw / 2, statsY + statsH * 0.45);
     ctx.fillStyle = '#888';
-    ctx.font = `${Math.floor(cw * 0.018)}px monospace`;
-    ctx.fillText(`${gameState.messesClean} of ${gameState.totalMesses} messes`, cw / 2, statsY + statsH * 0.75);
+    ctx.font = `${Math.floor(cw * 0.016)}px monospace`;
+    ctx.fillText(`${gameState.messesClean} of ${gameState.totalMesses} messes`, cw / 2, statsY + statsH * 0.80);
+
+    // Score share card
+    const shareY = statsY + statsH + Math.floor(ch * 0.015);
+    const shareH = Math.floor(ch * 0.12);
+    drawScoreShare(statsX, shareY, statsW, shareH, 0);
 
     // Hobo wisdom quote
-    drawHoboQuote(statsX, statsY + statsH + Math.floor(ch * 0.025), statsW, gridTop - (statsY + statsH) - Math.floor(ch * 0.05));
+    const quoteY = shareY + shareH + Math.floor(ch * 0.015);
+    const quoteH = gridTop - quoteY - Math.floor(ch * 0.015);
+    if (quoteH > 20) {
+        drawHoboQuote(statsX, quoteY, statsW, quoteH);
+    }
 }
 
 // ============================================
