@@ -29,6 +29,9 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
 const DEBUG_MODE = false;
 function debugLog(...args) { if (DEBUG_MODE) console.log(...args); }
 
+// Admin mode: bypass daily play limit via URL param ?admin=1
+const IS_ADMIN = new URLSearchParams(window.location.search).has('admin');
+
 // ============================================
 // PERFORMANCE: ANIMATION CACHE
 // ============================================
@@ -3156,12 +3159,13 @@ function drawTitleScreen() {
 
     // ── Layer 9: Touch-first card grid (2x2) at bottom of screen ──
     const dailyDist = DISTRICTS[getDailyDistrictIndex()];
+    const dailyDone = gameState.dailyPlayed && !IS_ADMIN;
     const selectedIndex = gameState._menuIndex || 0;
     const cardItems = [
         { icon: '\u{1F9F9}', label: 'START', desc: 'Begin District 1', accent: '#4ecdc4' },
         { icon: '\u26A1',    label: 'QUICK', desc: 'Random district', accent: '#ff8040' },
         { icon: '\u{1F5FA}', label: 'DISTRICTS', desc: 'Select district', accent: '#ffe66d' },
-        { icon: '\u{1F4C5}', label: 'DAILY', desc: dailyDist.name, accent: '#ff6b9d' },
+        { icon: '\u{1F4C5}', label: 'DAILY DISTRICT', desc: dailyDone ? 'Completed today!' : dailyDist.name, accent: dailyDone ? '#666' : '#ff6b9d' },
     ];
 
     const pad = Math.floor(cw * 0.03);
@@ -4281,6 +4285,10 @@ function titleMenuSelect(idx) {
         gameState.screen = 'districtSelect';
         gameState._distSelectIndex = 0;
     } else if (idx === 3) {
+        // Daily District — only once per day unless admin
+        if (gameState.dailyPlayed && !IS_ADMIN) {
+            return; // Already played today
+        }
         const dailyIdx = getDailyDistrictIndex();
         gameState._pendingMode = 'daily';
         gameState._pendingDistrict = dailyIdx;
@@ -4328,6 +4336,9 @@ function charSelectConfirm() {
         const idx = Math.floor(Math.random() * DISTRICTS.length);
         startDistrict(idx);
     } else if (mode === 'daily') {
+        gameState.dailyPlayed = true;
+        gameState.dailySeed = getDailySeed();
+        saveProgress();
         startDistrict(gameState._pendingDistrict || 0);
     } else if (mode === 'select') {
         startDistrict(gameState._pendingDistrict || 0);
@@ -4993,6 +5004,16 @@ function loadProgress() {
             gameState.headlinesSeen = data.headlinesSeen || [];
             gameState.selectedCharacter = data.selectedCharacter || 0;
             gameState.cityGrade = calculateGrade(gameState.totalStars);
+
+            // Daily district: reset if it's a new day
+            const todaySeed = getDailySeed();
+            if (data.dailySeed === todaySeed) {
+                gameState.dailyPlayed = data.dailyPlayed || false;
+                gameState.dailySeed = todaySeed;
+            } else {
+                gameState.dailyPlayed = false;
+                gameState.dailySeed = todaySeed;
+            }
         }
     } catch (e) {
         debugLog('Failed to load progress:', e);
@@ -5008,6 +5029,8 @@ function saveProgress() {
             districtsUnlocked: gameState.districtsUnlocked,
             headlinesSeen: gameState.headlinesSeen,
             selectedCharacter: gameState.selectedCharacter,
+            dailyPlayed: gameState.dailyPlayed,
+            dailySeed: gameState.dailySeed,
         }));
     } catch (e) {
         debugLog('Failed to save progress:', e);
