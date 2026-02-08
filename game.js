@@ -426,13 +426,13 @@ const CHARACTERS = [
     },
     {
         id: 'idaho-bro-1', name: 'Idahoan Brother #1', desc: 'Bald, bearded, probably reading',
-        color: '#608040', visorColor: '#a0d060', ability: 'armor',
-        abilityDesc: 'Immune to first earthquake',
+        color: '#608040', visorColor: '#a0d060', ability: 'bonus',
+        abilityDesc: '+10% bonus time (lost in a good book)',
     },
     {
         id: 'idaho-bro-2', name: 'Idahoan Brother #2', desc: 'Brewing essential oil potions, not cleaning',
-        color: '#406830', visorColor: '#80c040', ability: 'scout',
-        abilityDesc: '+30s time on first district',
+        color: '#406830', visorColor: '#80c040', ability: 'armor',
+        abilityDesc: 'Immune to first earthquake (oil shield)',
     },
     {
         id: 'marty', name: 'Marty', desc: 'Coffee-powered, scared of alleys',
@@ -451,13 +451,13 @@ const CHARACTERS = [
     },
     {
         id: 'eyeglass', name: 'The Eyeglass Aficionado', desc: 'Spots every speck through premium lenses',
-        color: '#a04080', visorColor: '#ff60c0', ability: 'vision',
-        abilityDesc: 'Wider visibility radius',
+        color: '#a04080', visorColor: '#ff60c0', ability: 'clean',
+        abilityDesc: 'Auto-clean is faster (eagle-eyed)',
     },
     {
         id: 'hr-lead', name: 'The HR Lead', desc: 'Will clean your street then poach your talent',
-        color: '#806040', visorColor: '#c0a080', ability: 'scout',
-        abilityDesc: '+30s time on first district',
+        color: '#806040', visorColor: '#c0a080', ability: 'efficiency',
+        abilityDesc: 'Cleaning earns +15% score bonus (talent optimizer)',
     },
     {
         id: 'partner', name: 'The Partner', desc: 'Closing deals and closing dumpster lids',
@@ -466,8 +466,8 @@ const CHARACTERS = [
     },
     {
         id: 'professor', name: 'The Professor', desc: 'Lectures pigeons on hygiene',
-        color: '#705030', visorColor: '#c0a070', ability: 'reveal',
-        abilityDesc: 'All messes visible on minimap',
+        color: '#705030', visorColor: '#c0a070', ability: 'scout',
+        abilityDesc: '+30s time on first district (prep lecture)',
     },
     {
         id: 'saas-exec', name: 'The SaaS Exec', desc: 'Reconciles messes like line items',
@@ -476,8 +476,8 @@ const CHARACTERS = [
     },
     {
         id: 'vp-bizdev', name: 'The VP of Biz Dev', desc: 'Oddly skilled with hammers',
-        color: '#306080', visorColor: '#50a0c0', ability: 'speed',
-        abilityDesc: '+20% move speed',
+        color: '#306080', visorColor: '#50a0c0', ability: 'armor',
+        abilityDesc: 'Immune to first earthquake (built tough)',
     },
     {
         id: 'wealth-mgr', name: 'The Wealth Manager', desc: 'Diversifies his cleaning portfolio',
@@ -557,7 +557,7 @@ function getRandomHoboQuote() {
 // ASSETS
 // ============================================
 const wordmarkImg = new Image();
-wordmarkImg.src = 'assets/wordmark.png';
+wordmarkImg.src = 'assets/wordmark.png?v=2';
 
 // ============================================
 // GAME STATE
@@ -3730,7 +3730,7 @@ function drawHoboQuote(x, y, w, h) {
     ctx.fillStyle = '#c0a050';
     ctx.font = `bold ${Math.floor(cw * 0.016)}px monospace`;
     ctx.textAlign = 'left';
-    ctx.fillText(`\u{1F9D4} ${hq.name} says:`, x + 10, y + 14);
+    ctx.fillText(`\u{1F9D9} ${hq.name} says:`, x + 10, y + 14);
 
     // Quote text (word-wrapped)
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
@@ -4946,6 +4946,15 @@ function initGame() {
     // ================================================================
     canvas.addEventListener('click', (e) => {
         const c = clientToCanvas(e.clientX, e.clientY);
+
+        // Back button (works on any screen that draws it)
+        if (mobileBackBtnRect &&
+            c.x >= mobileBackBtnRect.x && c.x <= mobileBackBtnRect.x + mobileBackBtnRect.w &&
+            c.y >= mobileBackBtnRect.y && c.y <= mobileBackBtnRect.y + mobileBackBtnRect.h) {
+            gameState.screen = 'title';
+            return;
+        }
+
         if (gameState.screen === 'playing') {
             // Pause button
             if (mobilePauseBtnRect &&
@@ -4974,11 +4983,18 @@ function initGame() {
                     return;
                 }
             }
-            // Share card click
+            // Share card click on end screens
             if (shareCardRect &&
                 c.x >= shareCardRect.x && c.x <= shareCardRect.x + shareCardRect.w &&
                 c.y >= shareCardRect.y && c.y <= shareCardRect.y + shareCardRect.h) {
                 shareScore();
+            }
+        } else if (gameState.screen === 'charSelect') {
+            // Confirm button click
+            if (charConfirmBtnRect &&
+                c.x >= charConfirmBtnRect.x && c.x <= charConfirmBtnRect.x + charConfirmBtnRect.w &&
+                c.y >= charConfirmBtnRect.y && c.y <= charConfirmBtnRect.y + charConfirmBtnRect.h) {
+                charSelectConfirm();
             }
         }
     });
