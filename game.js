@@ -455,7 +455,7 @@ const CHARACTERS = [
         abilityDesc: 'Immune to first earthquake',
     },
     {
-        id: 'idaho-bro-2', name: 'Idahoan Brother #2', desc: 'Dark-haired, bearded, quiet work ethic',
+        id: 'idaho-bro-2', name: 'Idahoan Brother #2', desc: 'Smells of pargumum and musk',
         color: '#406830', visorColor: '#80c040', ability: 'scout',
         abilityDesc: '+30s time on first district',
     },
