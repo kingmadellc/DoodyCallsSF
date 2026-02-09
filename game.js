@@ -149,6 +149,7 @@ const MESS = {
     LITTER: 1,
     POOP: 2,
     NEEDLES: 3,
+    BIRD_POOP: 4,
 };
 
 // Cleanliness state per tile
@@ -263,6 +264,8 @@ const COLORS = {
     poopHighlight: '#8b5e3c',
     needleColor: '#c0c0c8',
     needleTip: '#e84040',
+    birdPoopColor: '#e8e8d8',
+    birdPoopGreen: '#7a9a5a',
 
     // UI
     uiBg: '#1a1a2e',
@@ -296,52 +299,52 @@ const COLORS = {
 const DISTRICTS = [
     {
         id: 1, name: "Fisherman's Wharf", subtitle: "Tourist Trap",
-        timer: 60, messCount: 20, pigeonCount: 2, hoboCount: 0,
+        timer: 60, messCount: 20, pigeonCount: 2, hoboCount: 0, tweakerCount: 0,
         palette: { accent: '#4090c0', sky: '#2a3050', skyHorizon: '#d47040' }
     },
     {
         id: 2, name: "Union Square", subtitle: "Luxury Litter",
-        timer: 60, messCount: 25, pigeonCount: 2, hoboCount: 1,
+        timer: 60, messCount: 25, pigeonCount: 2, hoboCount: 1, tweakerCount: 0,
         palette: { accent: '#c0a040', sky: '#302848', skyHorizon: '#c06838' }
     },
     {
         id: 3, name: "SoMa", subtitle: "The Morning Commute",
-        timer: 60, messCount: 30, pigeonCount: 3, hoboCount: 2,
+        timer: 60, messCount: 30, pigeonCount: 3, hoboCount: 2, tweakerCount: 1,
         palette: { accent: '#a060c0', sky: '#282040', skyHorizon: '#b86048' }
     },
     {
         id: 4, name: "Russian Hill", subtitle: "The Scenic Route",
-        timer: 60, messCount: 30, pigeonCount: 3, hoboCount: 1,
+        timer: 60, messCount: 30, pigeonCount: 3, hoboCount: 1, tweakerCount: 0,
         palette: { accent: '#40a060', sky: '#283848', skyHorizon: '#d08050' }
     },
     {
         id: 5, name: "Haight-Ashbury", subtitle: "Vintage Refuse",
-        timer: 60, messCount: 35, pigeonCount: 3, hoboCount: 2,
+        timer: 60, messCount: 35, pigeonCount: 3, hoboCount: 2, tweakerCount: 2,
         palette: { accent: '#e04080', sky: '#302838', skyHorizon: '#c85848' }
     },
     {
         id: 6, name: "Mission District", subtitle: "Burrito Boulevard",
-        timer: 60, messCount: 35, pigeonCount: 4, hoboCount: 2,
+        timer: 60, messCount: 35, pigeonCount: 4, hoboCount: 2, tweakerCount: 2,
         palette: { accent: '#e08040', sky: '#302418', skyHorizon: '#d87838' }
     },
     {
         id: 7, name: "The Tenderloin", subtitle: "Danger Zone",
-        timer: 60, messCount: 45, pigeonCount: 5, hoboCount: 4,
+        timer: 60, messCount: 45, pigeonCount: 5, hoboCount: 4, tweakerCount: 4,
         palette: { accent: '#c04040', sky: '#1e1828', skyHorizon: '#a04830' }
     },
     {
         id: 8, name: "Golden Gate Park", subtitle: "Nature Fights Back",
-        timer: 60, messCount: 40, pigeonCount: 5, hoboCount: 3,
+        timer: 60, messCount: 40, pigeonCount: 5, hoboCount: 3, tweakerCount: 1,
         palette: { accent: '#40c060', sky: '#203828', skyHorizon: '#c89050' }
     },
     {
         id: 9, name: "Chinatown", subtitle: "Celebration Chaos",
-        timer: 60, messCount: 40, pigeonCount: 4, hoboCount: 2,
+        timer: 60, messCount: 40, pigeonCount: 4, hoboCount: 2, tweakerCount: 1,
         palette: { accent: '#e04040', sky: '#281820', skyHorizon: '#c05838' }
     },
     {
         id: 10, name: "City Hall", subtitle: "The Final Shift",
-        timer: 60, messCount: 50, pigeonCount: 6, hoboCount: 5,
+        timer: 60, messCount: 50, pigeonCount: 6, hoboCount: 5, tweakerCount: 3,
         palette: { accent: '#c0c0d0', sky: '#202030', skyHorizon: '#b06848' }
     },
 ];
@@ -590,6 +593,7 @@ let gameState = {
     cleanState: [],  // 2D: CLEAN_STATE
     pigeons: [],     // Array of pigeon objects
     hobos: [],       // Array of hobo objects
+    tweakers: [],    // Array of tweaker objects
 
     // Camera
     camera: { x: 0, y: 0, targetX: 0, targetY: 0 },
@@ -1096,6 +1100,8 @@ function generateCityBlock(districtIndex) {
     }
 
     // === SCATTER MESSES ===
+    // Pigeons → BIRD_POOP, Hobos → POOP, Tweakers → NEEDLES/LITTER
+    // Pre-placed messes reflect the neighborhood character
     let messCount = district.messCount;
     let placed = 0;
     let attempts = 0;
@@ -1106,50 +1112,71 @@ function generateCityBlock(districtIndex) {
         if (isCleanableTile(tiles[y][x]) && messes[y][x] === MESS.NONE) {
             // Pick mess type based on tile and district
             if (tiles[y][x] === TILE.ALLEY) {
-                messes[y][x] = Math.random() < 0.5 ? MESS.NEEDLES : MESS.POOP;
-            } else if (tiles[y][x] === TILE.PARK_GRASS) {
-                messes[y][x] = Math.random() < 0.8 ? MESS.POOP : MESS.LITTER;
-            } else if (districtIndex === 0) {
-                // Fisherman's Wharf: tourists leave litter, some poop
+                // Alleys: needles + human poop, some bird poop
                 const roll = Math.random();
-                if (roll < 0.45) messes[y][x] = MESS.LITTER;
-                else if (roll < 0.8) messes[y][x] = MESS.POOP;
-                else messes[y][x] = MESS.NEEDLES;
+                if (roll < 0.40) messes[y][x] = MESS.NEEDLES;
+                else if (roll < 0.75) messes[y][x] = MESS.POOP;
+                else messes[y][x] = MESS.BIRD_POOP;
+            } else if (tiles[y][x] === TILE.PARK_GRASS) {
+                // Parks: lots of bird poop, some human poop, litter
+                const roll = Math.random();
+                if (roll < 0.50) messes[y][x] = MESS.BIRD_POOP;
+                else if (roll < 0.75) messes[y][x] = MESS.POOP;
+                else messes[y][x] = MESS.LITTER;
+            } else if (districtIndex === 0) {
+                // Fisherman's Wharf: tourists leave litter, birds everywhere
+                const roll = Math.random();
+                if (roll < 0.40) messes[y][x] = MESS.LITTER;
+                else if (roll < 0.70) messes[y][x] = MESS.BIRD_POOP;
+                else messes[y][x] = MESS.POOP;
             } else if (districtIndex === 4) {
                 // Haight-Ashbury: heavy needles
                 const roll = Math.random();
-                if (roll < 0.45) messes[y][x] = MESS.NEEDLES;
-                else if (roll < 0.7) messes[y][x] = MESS.POOP;
-                else messes[y][x] = MESS.LITTER;
+                if (roll < 0.40) messes[y][x] = MESS.NEEDLES;
+                else if (roll < 0.60) messes[y][x] = MESS.POOP;
+                else if (roll < 0.80) messes[y][x] = MESS.LITTER;
+                else messes[y][x] = MESS.BIRD_POOP;
             } else if (districtIndex === 5) {
                 // Mission: mixed mess
                 const roll = Math.random();
-                if (roll < 0.35) messes[y][x] = MESS.POOP;
-                else if (roll < 0.65) messes[y][x] = MESS.LITTER;
-                else messes[y][x] = MESS.NEEDLES;
+                if (roll < 0.25) messes[y][x] = MESS.POOP;
+                else if (roll < 0.50) messes[y][x] = MESS.LITTER;
+                else if (roll < 0.75) messes[y][x] = MESS.NEEDLES;
+                else messes[y][x] = MESS.BIRD_POOP;
             } else if (districtIndex === 6) {
                 // Tenderloin: heavy poop + needles
                 const roll = Math.random();
-                if (roll < 0.4) messes[y][x] = MESS.POOP;
-                else if (roll < 0.75) messes[y][x] = MESS.NEEDLES;
-                else messes[y][x] = MESS.LITTER;
+                if (roll < 0.35) messes[y][x] = MESS.POOP;
+                else if (roll < 0.65) messes[y][x] = MESS.NEEDLES;
+                else if (roll < 0.80) messes[y][x] = MESS.LITTER;
+                else messes[y][x] = MESS.BIRD_POOP;
             } else if (districtIndex === 7) {
-                // Golden Gate Park: mostly poop (dogs), some litter
+                // Golden Gate Park: bird poop + dog poop, some litter
                 const roll = Math.random();
-                if (roll < 0.5) messes[y][x] = MESS.POOP;
+                if (roll < 0.35) messes[y][x] = MESS.BIRD_POOP;
+                else if (roll < 0.60) messes[y][x] = MESS.POOP;
                 else if (roll < 0.85) messes[y][x] = MESS.LITTER;
                 else messes[y][x] = MESS.NEEDLES;
             } else if (districtIndex === 8) {
-                // Chinatown: litter heavy, some poop
+                // Chinatown: litter heavy, bird poop from pigeons
                 const roll = Math.random();
-                if (roll < 0.45) messes[y][x] = MESS.LITTER;
-                else if (roll < 0.8) messes[y][x] = MESS.POOP;
+                if (roll < 0.40) messes[y][x] = MESS.LITTER;
+                else if (roll < 0.65) messes[y][x] = MESS.BIRD_POOP;
+                else if (roll < 0.85) messes[y][x] = MESS.POOP;
                 else messes[y][x] = MESS.NEEDLES;
-            } else {
-                // Default distribution
+            } else if (districtIndex === 9) {
+                // City Hall: mixed with emphasis on needles + poop
                 const roll = Math.random();
-                if (roll < 0.35) messes[y][x] = MESS.LITTER;
-                else if (roll < 0.65) messes[y][x] = MESS.POOP;
+                if (roll < 0.30) messes[y][x] = MESS.NEEDLES;
+                else if (roll < 0.55) messes[y][x] = MESS.POOP;
+                else if (roll < 0.75) messes[y][x] = MESS.LITTER;
+                else messes[y][x] = MESS.BIRD_POOP;
+            } else {
+                // Default distribution (Union Sq, SoMa, Russian Hill)
+                const roll = Math.random();
+                if (roll < 0.30) messes[y][x] = MESS.LITTER;
+                else if (roll < 0.55) messes[y][x] = MESS.POOP;
+                else if (roll < 0.75) messes[y][x] = MESS.BIRD_POOP;
                 else messes[y][x] = MESS.NEEDLES;
             }
             cleanState[y][x] = Math.random() < 0.4 ? CLEAN_STATE.FILTHY : CLEAN_STATE.DIRTY;
@@ -1183,7 +1210,17 @@ function generateCityBlock(districtIndex) {
         spawnHobo();
     }
 
-    debugLog(`Generated district ${district.name}: ${total} messes, ${district.pigeonCount} pigeons, ${district.hoboCount} hobos`);
+    // Generate tweakers
+    gameState.tweakers = [];
+    for (let i = 0; i < (district.tweakerCount || 0); i++) {
+        spawnTweaker();
+    }
+
+    // Randomize news ticker starting headline
+    gameState.tickerIndex = Math.floor(Math.random() * NEWS_HEADLINES.length);
+    gameState.tickerOffset = 0;
+
+    debugLog(`Generated district ${district.name}: ${total} messes, ${district.pigeonCount} pigeons, ${district.hoboCount} hobos, ${district.tweakerCount || 0} tweakers`);
 }
 
 function placeBuilding(tiles, startX, startY, w, h) {
@@ -1443,7 +1480,7 @@ function updatePigeons(dt) {
 }
 
 function pigeonBomb(cx, cy) {
-    // Dirty a 3x3 area around the pigeon
+    // Dirty a 3x3 area around the pigeon with bird poop (white/green splatter)
     for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
             const x = cx + dx;
@@ -1458,9 +1495,9 @@ function pigeonBomb(cx, cy) {
                     }
                     gameState.cleanState[y][x] = CLEAN_STATE.DIRTY;
                 }
-                // Add mess if there wasn't one
+                // Add bird poop mess if there wasn't one
                 if (gameState.messes[y][x] === MESS.NONE) {
-                    gameState.messes[y][x] = MESS.POOP;
+                    gameState.messes[y][x] = MESS.BIRD_POOP;
                     gameState.cleanState[y][x] = CLEAN_STATE.DIRTY;
                     gameState.totalMesses++;
                 }
@@ -1592,6 +1629,172 @@ function hoboPoop(cx, cy) {
         }
         if (gameState.messes[cy][cx] === MESS.NONE) {
             gameState.messes[cy][cx] = MESS.POOP;
+            gameState.cleanState[cy][cx] = CLEAN_STATE.FILTHY;
+            gameState.totalMesses++;
+        } else {
+            gameState.cleanState[cy][cx] = CLEAN_STATE.FILTHY;
+        }
+        spawnSplatParticles(cx, cy);
+    }
+}
+
+// ============================================
+// TWEAKER NPC
+// ============================================
+function spawnTweaker() {
+    let x, y, attempts = 0;
+    do {
+        x = Math.floor(Math.random() * MAP_WIDTH);
+        y = Math.floor(Math.random() * MAP_HEIGHT);
+        attempts++;
+    } while ((isBlockingTile(gameState.tiles[y][x]) ||
+              gameState.tiles[y][x] === TILE.ROAD ||
+              gameState.tiles[y][x] === TILE.PARK_GRASS) && attempts < 100);
+
+    gameState.tweakers.push({
+        x, y,
+        visualX: x, visualY: y,
+        direction: Math.floor(Math.random() * 4),
+        moveTimer: Math.random() * 2,
+        state: 'tweaking',  // tweaking, wandering, dropping, fleeing
+        dropTimer: 6 + Math.random() * 8,
+        dropDuration: 0,
+        idleTimer: 1 + Math.random() * 3,
+        frame: 0,
+        jitterX: 0, jitterY: 0,
+    });
+}
+
+function updateTweakers(dt) {
+    for (const tw of gameState.tweakers) {
+        tw.frame += dt * 5;
+
+        // Constant jitter (twitchy movement)
+        tw.jitterX = (Math.random() - 0.5) * 1.5;
+        tw.jitterY = (Math.random() - 0.5) * 1.5;
+
+        // Smooth visual lerp
+        const lerpSpeed = 8 * dt;
+        tw.visualX += (tw.x - tw.visualX) * Math.min(1, lerpSpeed);
+        tw.visualY += (tw.y - tw.visualY) * Math.min(1, lerpSpeed);
+
+        // Distance to player
+        const px = gameState.player.x;
+        const py = gameState.player.y;
+        const dist = Math.abs(tw.x - px) + Math.abs(tw.y - py);
+
+        // State machine
+        if (tw.state === 'fleeing') {
+            tw.moveTimer -= dt;
+            if (tw.moveTimer <= 0) {
+                // Erratic flee — mostly away from player but sometimes random
+                let mx = 0, my = 0;
+                if (Math.random() < 0.7) {
+                    const fdx = tw.x - px;
+                    const fdy = tw.y - py;
+                    if (Math.abs(fdx) > Math.abs(fdy)) mx = fdx > 0 ? 1 : -1;
+                    else my = fdy > 0 ? 1 : -1;
+                } else {
+                    // Random erratic direction
+                    const dirs = [{x:0,y:1},{x:-1,y:0},{x:0,y:-1},{x:1,y:0}];
+                    const d = dirs[Math.floor(Math.random() * 4)];
+                    mx = d.x; my = d.y;
+                }
+
+                const nx = tw.x + mx;
+                const ny = tw.y + my;
+                if (nx >= 0 && nx < MAP_WIDTH && ny >= 0 && ny < MAP_HEIGHT &&
+                    !isBlockingTile(gameState.tiles[ny][nx])) {
+                    tw.x = nx;
+                    tw.y = ny;
+                    tw.direction = mx > 0 ? 3 : mx < 0 ? 1 : my > 0 ? 0 : 2;
+                }
+                tw.moveTimer = 0.10; // Fast erratic movement
+                tw.idleTimer -= dt;
+                if (tw.idleTimer <= 0 || dist > 10) {
+                    tw.state = 'tweaking';
+                    tw.idleTimer = 2 + Math.random() * 3;
+                }
+            }
+        } else if (tw.state === 'dropping') {
+            tw.dropDuration -= dt;
+            if (tw.dropDuration <= 0) {
+                // Done dropping — leave needles or litter
+                tweakerDrop(tw.x, tw.y);
+                tw.state = 'fleeing';
+                tw.idleTimer = 2;
+                tw.moveTimer = 0;
+                tw.dropTimer = 6 + Math.random() * 10;
+                addCelebration('NEEDLES!', tw.x, tw.y - 1, COLORS.needleTip);
+                triggerShake(0.1, 2);
+            }
+        } else {
+            // Tweaking or wandering
+            tw.dropTimer -= dt;
+            tw.idleTimer -= dt;
+
+            // Flee if player gets close
+            if (dist <= 4) {
+                tw.state = 'fleeing';
+                tw.idleTimer = 2;
+                tw.moveTimer = 0;
+            }
+            // Time to drop?
+            else if (tw.dropTimer <= 0) {
+                const tile = gameState.tiles[tw.y][tw.x];
+                if (tile === TILE.ALLEY || tile === TILE.SIDEWALK) {
+                    tw.state = 'dropping';
+                    tw.dropDuration = 0.8;
+                } else {
+                    // Not in a good spot, keep wandering
+                    tw.dropTimer = 1 + Math.random() * 2;
+                    tw.state = 'wandering';
+                }
+            }
+            // Erratic wandering
+            else if (tw.idleTimer <= 0) {
+                tw.moveTimer -= dt;
+                if (tw.moveTimer <= 0) {
+                    // More erratic than hobos — change direction often
+                    if (Math.random() < 0.5) {
+                        tw.direction = Math.floor(Math.random() * 4);
+                    }
+                    const dirs = [{x:0,y:1},{x:-1,y:0},{x:0,y:-1},{x:1,y:0}];
+                    const d = dirs[tw.direction];
+                    const nx = tw.x + d.x;
+                    const ny = tw.y + d.y;
+                    if (nx >= 0 && nx < MAP_WIDTH && ny >= 0 && ny < MAP_HEIGHT &&
+                        !isBlockingTile(gameState.tiles[ny][nx])) {
+                        tw.x = nx;
+                        tw.y = ny;
+                    } else {
+                        tw.direction = Math.floor(Math.random() * 4);
+                    }
+                    tw.moveTimer = 0.25 + Math.random() * 0.25; // Faster than hobos
+
+                    if (Math.random() < 0.1) {
+                        tw.state = 'tweaking';
+                        tw.idleTimer = 1 + Math.random() * 2;
+                    }
+                }
+            }
+        }
+    }
+}
+
+function tweakerDrop(cx, cy) {
+    if (cx >= 0 && cx < MAP_WIDTH && cy >= 0 && cy < MAP_HEIGHT &&
+        isCleanableTile(gameState.tiles[cy][cx])) {
+        if (gameState.cleanState[cy][cx] === CLEAN_STATE.CLEAN ||
+            gameState.cleanState[cy][cx] === CLEAN_STATE.SPARKLING) {
+            if (gameState.messes[cy][cx] !== MESS.NONE) {
+                gameState.messesClean = Math.max(0, gameState.messesClean - 1);
+            }
+            gameState.cleanState[cy][cx] = CLEAN_STATE.FILTHY;
+        }
+        if (gameState.messes[cy][cx] === MESS.NONE) {
+            // 70% needles, 30% litter
+            gameState.messes[cy][cx] = Math.random() < 0.7 ? MESS.NEEDLES : MESS.LITTER;
             gameState.cleanState[cy][cx] = CLEAN_STATE.FILTHY;
             gameState.totalMesses++;
         } else {
@@ -2561,6 +2764,32 @@ function drawTile(x, y) {
                 ctx.fillStyle = '#e08030';
                 ctx.fillRect(sx + 16, sy + 14, 3, 2);
                 break;
+
+            case MESS.BIRD_POOP:
+                // White/green splatter puddle — pigeon droppings
+                // Main splat (white/cream)
+                ctx.fillStyle = COLORS.birdPoopColor;
+                ctx.beginPath();
+                ctx.ellipse(sx + TILE_SIZE / 2, sy + TILE_SIZE / 2 + 2,
+                    TILE_SIZE / 3, TILE_SIZE / 4, 0, 0, Math.PI * 2);
+                ctx.fill();
+                // Smaller splat overlap
+                ctx.beginPath();
+                ctx.ellipse(sx + TILE_SIZE / 2 + 3, sy + TILE_SIZE / 2 - 1,
+                    TILE_SIZE / 5, TILE_SIZE / 5.5, 0.4, 0, Math.PI * 2);
+                ctx.fill();
+                // Green speckles
+                ctx.fillStyle = COLORS.birdPoopGreen;
+                ctx.fillRect(sx + 8, sy + 11, 3, 2);
+                ctx.fillRect(sx + 14, sy + 14, 2, 2);
+                ctx.fillRect(sx + 11, sy + 17, 2, 2);
+                ctx.fillRect(sx + 17, sy + 10, 2, 3);
+                ctx.fillRect(sx + 6, sy + 15, 2, 2);
+                // Wet shine highlight
+                ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                ctx.fillRect(sx + 10, sy + 10, 2, 2);
+                ctx.fillRect(sx + 15, sy + 12, 2, 1);
+                break;
         }
 
         ctx.globalAlpha = 1;
@@ -2782,6 +3011,108 @@ function drawHobo(hobo) {
                 ctx.textAlign = 'center';
                 ctx.fillText('!', sx + TILE_SIZE / 2, sy - 2 + bob);
             }
+        }
+    }
+}
+
+function drawTweaker(tw) {
+    const sx = tw.visualX * TILE_SIZE + tw.jitterX;
+    const sy = tw.visualY * TILE_SIZE + tw.jitterY;
+    const isDropping = tw.state === 'dropping';
+    const bob = isDropping ? 0 : Math.sin(tw.frame * 5) * 1.5;
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.beginPath();
+    ctx.ellipse(sx + TILE_SIZE / 2, sy + TILE_SIZE - 2, 5, 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (isDropping) {
+        // Crouching pose
+        // Legs (bent tight)
+        ctx.fillStyle = '#2a2a35';
+        ctx.fillRect(sx + 4, sy + TILE_SIZE - 6, 3, 4);
+        ctx.fillRect(sx + TILE_SIZE - 7, sy + TILE_SIZE - 6, 3, 4);
+
+        // Body (hunched, thin)
+        ctx.fillStyle = '#3a3a48';
+        ctx.fillRect(sx + 5, sy + TILE_SIZE / 2 + 1, TILE_SIZE - 10, 6);
+
+        // Head (ducked)
+        ctx.fillStyle = '#c8a882';
+        ctx.beginPath();
+        ctx.arc(sx + TILE_SIZE / 2, sy + TILE_SIZE / 2 - 1, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Hood
+        ctx.fillStyle = '#3a3a48';
+        ctx.beginPath();
+        ctx.arc(sx + TILE_SIZE / 2, sy + TILE_SIZE / 2 - 2, 3.5, Math.PI, 0);
+        ctx.fill();
+
+        // Needle in hand
+        ctx.strokeStyle = COLORS.needleColor;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(sx + TILE_SIZE / 2 + 4, sy + TILE_SIZE / 2 + 2);
+        ctx.lineTo(sx + TILE_SIZE / 2 + 9, sy + TILE_SIZE / 2 + 5);
+        ctx.stroke();
+        ctx.fillStyle = COLORS.needleTip;
+        ctx.fillRect(sx + TILE_SIZE / 2 + 8, sy + TILE_SIZE / 2 + 4, 2, 2);
+    } else {
+        // Standing/walking — skinny hunched figure in hoodie
+        // Legs (thin)
+        ctx.fillStyle = '#2a2a35';
+        const legOffset = Math.sin(tw.frame * 4) * 2;
+        ctx.fillRect(sx + 6, sy + TILE_SIZE - 6 + bob, 2, 5);
+        ctx.fillRect(sx + TILE_SIZE - 8, sy + TILE_SIZE - 6 + bob + legOffset, 2, 5);
+
+        // Body (thin hoodie)
+        ctx.fillStyle = '#3a3a48';
+        ctx.fillRect(sx + 5, sy + TILE_SIZE / 2 - 3 + bob, TILE_SIZE - 10, 8);
+
+        // Arms (thin, hanging or twitchy)
+        ctx.fillRect(sx + 3, sy + TILE_SIZE / 2 - 1 + bob, 2, 6);
+        ctx.fillRect(sx + TILE_SIZE - 5, sy + TILE_SIZE / 2 - 1 + bob, 2, 6);
+
+        // Head
+        ctx.fillStyle = '#c8a882';
+        ctx.beginPath();
+        ctx.arc(sx + TILE_SIZE / 2, sy + TILE_SIZE / 2 - 5 + bob, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Hood (dark)
+        ctx.fillStyle = '#3a3a48';
+        ctx.beginPath();
+        ctx.arc(sx + TILE_SIZE / 2, sy + TILE_SIZE / 2 - 6 + bob, 3.5, Math.PI, 0.2);
+        ctx.fill();
+
+        // Eyes (wild, darting)
+        const eyeDart = Math.sin(tw.frame * 8) * 1.5;
+        ctx.fillStyle = '#ff4444';
+        ctx.fillRect(sx + TILE_SIZE / 2 - 2 + eyeDart, sy + TILE_SIZE / 2 - 6 + bob, 1, 1);
+        ctx.fillRect(sx + TILE_SIZE / 2 + 1 + eyeDart, sy + TILE_SIZE / 2 - 6 + bob, 1, 1);
+
+        // Fleeing indicator
+        if (tw.state === 'fleeing') {
+            const flash = Math.sin(animCache.time * 15) > 0;
+            if (flash) {
+                ctx.fillStyle = '#ff4444';
+                ctx.font = `${Math.floor(TILE_SIZE * 0.4)}px monospace`;
+                ctx.textAlign = 'center';
+                ctx.fillText('!', sx + TILE_SIZE / 2, sy - 2 + bob);
+            }
+        }
+
+        // Tweaking state: scratch lines / twitchy particles
+        if (tw.state === 'tweaking') {
+            const scratchAlpha = 0.2 + Math.sin(tw.frame * 6) * 0.15;
+            ctx.strokeStyle = `rgba(255,100,100,${scratchAlpha})`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(sx + TILE_SIZE / 2 + 6, sy + TILE_SIZE / 2 - 8 + bob);
+            ctx.lineTo(sx + TILE_SIZE / 2 + 9, sy + TILE_SIZE / 2 - 5 + bob);
+            ctx.stroke();
         }
     }
 }
@@ -4802,6 +5133,7 @@ function update(dt) {
         updatePlayer(dt);
         updatePigeons(dt);
         updateHobos(dt);
+        updateTweakers(dt);
         updateEarthquake(dt);
         updatePigeonFrenzy(dt);
         updateCamera(dt);
@@ -5165,6 +5497,11 @@ function drawGameWorld() {
     // Draw hobos
     for (const hobo of gameState.hobos) {
         drawHobo(hobo);
+    }
+
+    // Draw tweakers
+    for (const tw of gameState.tweakers) {
+        drawTweaker(tw);
     }
 
     // Draw particles (in world space)
