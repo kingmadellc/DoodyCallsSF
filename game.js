@@ -89,14 +89,93 @@ const displaySettings = {
     baseWidth: 640,
     baseHeight: 640,
     scale: 1,
-    currentResolution: '640x640'
+    currentResolution: '640x640',
+    fullscreen: false
 };
 
 const RESOLUTIONS = {
-    '640x640': { width: 640, height: 640, scale: 1, aspectRatio: '1:1' },
-    '800x800': { width: 800, height: 800, scale: 1.25, aspectRatio: '1:1' },
-    '960x960': { width: 960, height: 960, scale: 1.5, aspectRatio: '1:1' },
+    // 1:1 (square)
+    '640x640':   { width: 640,  height: 640,  scale: 1,    aspectRatio: '1:1',   label: '640\u00D7640 (1:1)' },
+    '800x800':   { width: 800,  height: 800,  scale: 1.25, aspectRatio: '1:1',   label: '800\u00D7800 (1:1)' },
+    '960x960':   { width: 960,  height: 960,  scale: 1.5,  aspectRatio: '1:1',   label: '960\u00D7960 (1:1)' },
+    // 16:9 widescreen (ROG Ally 1080p, large monitors)
+    '1136x640':  { width: 1136, height: 640,  scale: 1,    aspectRatio: '16:9',  label: '1136\u00D7640 (16:9)' },
+    '1280x720':  { width: 1280, height: 720,  scale: 1.125,aspectRatio: '16:9',  label: '1280\u00D7720 (HD)' },
+    '1920x1080': { width: 1920, height: 1080, scale: 1.6875,aspectRatio: '16:9', label: '1920\u00D71080 (FHD)' },
+    '2560x1440': { width: 2560, height: 1440, scale: 2.25, aspectRatio: '16:9',  label: '2560\u00D71440 (QHD)' },
+    // 16:10 (ROG Ally X, MacBook)
+    '1280x800':  { width: 1280, height: 800,  scale: 1.25, aspectRatio: '16:10', label: '1280\u00D7800 (16:10)' },
+    '1920x1200': { width: 1920, height: 1200, scale: 1.875,aspectRatio: '16:10', label: '1920\u00D71200 (WUXGA)' },
 };
+
+const RESOLUTION_ORDER = [
+    '640x640', '800x800', '960x960',
+    '1136x640', '1280x720', '1920x1080', '2560x1440',
+    '1280x800', '1920x1200'
+];
+
+// ============================================
+// FULLSCREEN & RESOLUTION HELPERS
+// ============================================
+function toggleFullscreen() {
+    const container = document.getElementById('gameContainer');
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        const req = container.requestFullscreen || container.webkitRequestFullscreen;
+        if (req) req.call(container).catch(() => {});
+        displaySettings.fullscreen = true;
+    } else {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen;
+        if (exit) exit.call(document).catch(() => {});
+        displaySettings.fullscreen = false;
+    }
+    saveDisplaySettings();
+}
+
+function isFullscreen() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+}
+
+function applyResolution(resKey) {
+    const res = RESOLUTIONS[resKey];
+    if (!res) return;
+    displaySettings.currentResolution = resKey;
+    canvas.width = res.width;
+    canvas.height = res.height;
+    TILE_SIZE = getTileSize();
+    saveDisplaySettings();
+}
+
+function saveDisplaySettings() {
+    try {
+        localStorage.setItem('doodyCalls_display', JSON.stringify({
+            resolution: displaySettings.currentResolution,
+            fullscreen: displaySettings.fullscreen
+        }));
+    } catch (e) { debugLog('Failed to save display settings:', e); }
+}
+
+function loadDisplaySettings() {
+    try {
+        const saved = localStorage.getItem('doodyCalls_display');
+        if (saved) {
+            const data = JSON.parse(saved);
+            if (data.resolution && RESOLUTIONS[data.resolution]) {
+                displaySettings.currentResolution = data.resolution;
+            }
+            if (data.fullscreen !== undefined) {
+                displaySettings.fullscreen = data.fullscreen;
+            }
+        }
+    } catch (e) { debugLog('Failed to load display settings:', e); }
+}
+
+// Listen for fullscreen changes (e.g. user presses Esc to exit)
+document.addEventListener('fullscreenchange', () => {
+    displaySettings.fullscreen = isFullscreen();
+});
+document.addEventListener('webkitfullscreenchange', () => {
+    displaySettings.fullscreen = isFullscreen();
+});
 
 // ============================================
 // VIEWPORT / CAMERA
@@ -3429,6 +3508,232 @@ function drawNewsTicker() {
 }
 
 // ============================================
+// SETTINGS SCREEN
+// ============================================
+let settingsItemRects = [];
+
+function drawSettingsScreen() {
+    const cw = canvas.width;
+    const ch = canvas.height;
+    const idx = gameState._settingsIndex || 0;
+
+    // Background
+    ctx.fillStyle = '#0a0a1a';
+    ctx.fillRect(0, 0, cw, ch);
+
+    // Title
+    ctx.fillStyle = '#a0a0c0';
+    ctx.font = `bold ${Math.floor(cw * 0.06)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText('SETTINGS', cw / 2, ch * 0.12);
+
+    // Subtitle
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.font = `${Math.floor(cw * 0.02)}px monospace`;
+    ctx.fillText('Display & Resolution', cw / 2, ch * 0.17);
+
+    // Settings items
+    const items = [];
+
+    // 1. Fullscreen toggle
+    items.push({
+        label: 'Fullscreen',
+        value: isFullscreen() ? 'ON' : 'OFF',
+        type: 'toggle',
+        action: 'fullscreen'
+    });
+
+    // 2. Resolution selector
+    const currentRes = RESOLUTIONS[displaySettings.currentResolution];
+    items.push({
+        label: 'Resolution',
+        value: currentRes ? currentRes.label : displaySettings.currentResolution,
+        type: 'selector',
+        action: 'resolution'
+    });
+
+    // 3. Auto-detect resolution
+    items.push({
+        label: 'Auto-Detect',
+        value: 'Match screen',
+        type: 'button',
+        action: 'autodetect'
+    });
+
+    // 4. Back
+    items.push({
+        label: 'Back',
+        value: '',
+        type: 'button',
+        action: 'back'
+    });
+
+    const itemW = Math.floor(cw * 0.7);
+    const itemH = Math.floor(ch * 0.08);
+    const startY = ch * 0.24;
+    const gapY = Math.floor(ch * 0.015);
+
+    settingsItemRects = [];
+
+    for (let i = 0; i < items.length; i++) {
+        const x = (cw - itemW) / 2;
+        const y = startY + i * (itemH + gapY);
+        const selected = i === idx;
+        const item = items[i];
+
+        settingsItemRects.push({ x, y, w: itemW, h: itemH, idx: i, action: item.action });
+
+        // Button background
+        ctx.fillStyle = selected ? 'rgba(160,160,192,0.20)' : 'rgba(255,255,255,0.06)';
+        ctx.beginPath();
+        ctx.roundRect(x, y, itemW, itemH, 8);
+        ctx.fill();
+
+        // Button border
+        ctx.strokeStyle = selected ? '#a0a0c0' : 'rgba(255,255,255,0.12)';
+        ctx.lineWidth = selected ? 2 : 1;
+        ctx.beginPath();
+        ctx.roundRect(x, y, itemW, itemH, 8);
+        ctx.stroke();
+
+        // Selected glow
+        if (selected) {
+            ctx.shadowColor = '#a0a0c0';
+            ctx.shadowBlur = 12;
+            ctx.beginPath();
+            ctx.roundRect(x, y, itemW, itemH, 8);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        // Label (left-aligned)
+        const labelSize = Math.floor(cw * 0.03);
+        ctx.fillStyle = selected ? '#ffffff' : 'rgba(255,255,255,0.6)';
+        ctx.font = `bold ${labelSize}px monospace`;
+        ctx.textAlign = 'left';
+        ctx.fillText(item.label, x + 16, y + itemH / 2 + labelSize * 0.35);
+
+        // Value (right-aligned)
+        if (item.value) {
+            const valueColor = (item.action === 'fullscreen' && isFullscreen()) ? '#4ecdc4' : '#a0a0c0';
+            ctx.fillStyle = selected ? valueColor : 'rgba(160,160,192,0.6)';
+            ctx.font = `${Math.floor(cw * 0.024)}px monospace`;
+            ctx.textAlign = 'right';
+            ctx.fillText(item.value, x + itemW - 16, y + itemH / 2 + labelSize * 0.35);
+
+            // Left/right arrows for selectors when selected
+            if (selected && item.type === 'selector') {
+                const arrowSize = Math.floor(cw * 0.022);
+                ctx.font = `bold ${arrowSize}px monospace`;
+                ctx.fillStyle = '#a0a0c0';
+                const valW = ctx.measureText(item.value).width;
+                ctx.textAlign = 'right';
+                ctx.fillText('\u25C0', x + itemW - 16 - valW - 8, y + itemH / 2 + arrowSize * 0.35);
+                ctx.textAlign = 'left';
+                ctx.fillText('\u25B6', x + itemW - 12, y + itemH / 2 + arrowSize * 0.35);
+            }
+        }
+    }
+
+    // Current resolution info
+    const infoY = startY + items.length * (itemH + gapY) + Math.floor(ch * 0.04);
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.font = `${Math.floor(cw * 0.018)}px monospace`;
+    ctx.textAlign = 'center';
+    const screenW = window.screen.width;
+    const screenH = window.screen.height;
+    const dpr = window.devicePixelRatio || 1;
+    ctx.fillText(`Screen: ${screenW}\u00D7${screenH} @ ${dpr}x  |  Canvas: ${cw}\u00D7${ch}`, cw / 2, infoY);
+
+    // Controls hint
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.font = `${Math.floor(cw * 0.018)}px monospace`;
+    ctx.textAlign = 'center';
+    if (isMobile) {
+        ctx.fillText('Tap to select', cw / 2, ch - 20);
+    } else {
+        ctx.fillText('\u2191\u2193 Navigate  \u2022  \u2190\u2192 Change  \u2022  Enter Select  \u2022  Esc Back', cw / 2, ch - 20);
+    }
+}
+
+function updateSettings(dt) {
+    if (gameState._settingsIndex === undefined) gameState._settingsIndex = 0;
+    const maxIdx = 3; // 4 items: 0=fullscreen, 1=resolution, 2=autodetect, 3=back
+
+    if (inputActions.up) {
+        gameState._settingsIndex = Math.max(0, gameState._settingsIndex - 1);
+    }
+    if (inputActions.down) {
+        gameState._settingsIndex = Math.min(maxIdx, gameState._settingsIndex + 1);
+    }
+
+    // Back on Escape
+    if (inputActions.pause) {
+        gameState.screen = 'title';
+        return;
+    }
+
+    const idx = gameState._settingsIndex;
+
+    // Left/right for resolution cycling
+    if (idx === 1) {
+        if (inputActions.left) {
+            cycleResolution(-1);
+        }
+        if (inputActions.right) {
+            cycleResolution(1);
+        }
+    }
+
+    // Confirm
+    if (inputActions.confirm) {
+        if (idx === 0) {
+            toggleFullscreen();
+        } else if (idx === 1) {
+            cycleResolution(1);
+        } else if (idx === 2) {
+            autoDetectResolution();
+        } else if (idx === 3) {
+            gameState.screen = 'title';
+        }
+    }
+}
+
+function cycleResolution(dir) {
+    const curIdx = RESOLUTION_ORDER.indexOf(displaySettings.currentResolution);
+    let newIdx = curIdx + dir;
+    if (newIdx < 0) newIdx = RESOLUTION_ORDER.length - 1;
+    if (newIdx >= RESOLUTION_ORDER.length) newIdx = 0;
+    applyResolution(RESOLUTION_ORDER[newIdx]);
+}
+
+function autoDetectResolution() {
+    const screenW = window.screen.width * (window.devicePixelRatio || 1);
+    const screenH = window.screen.height * (window.devicePixelRatio || 1);
+    const ratio = screenW / screenH;
+
+    // Find best matching resolution
+    let bestKey = '640x640';
+    let bestScore = -1;
+
+    for (const key of RESOLUTION_ORDER) {
+        const res = RESOLUTIONS[key];
+        const resRatio = res.width / res.height;
+        // Prefer matching aspect ratio, then largest that fits screen
+        const ratioMatch = 1 - Math.abs(ratio - resRatio);
+        const fits = (res.width <= screenW && res.height <= screenH) ? 1 : 0;
+        const sizeScore = (res.width * res.height) / (screenW * screenH);
+        const score = ratioMatch * 3 + fits * 2 + sizeScore;
+        if (fits && score > bestScore) {
+            bestScore = score;
+            bestKey = key;
+        }
+    }
+
+    applyResolution(bestKey);
+}
+
+// ============================================
 // DRAWING - TITLE SCREEN
 // ============================================
 // ── Title screen card hit rects (rebuilt every frame) ──
@@ -3473,7 +3778,7 @@ function drawTitleScreen() {
 
     // ── Layer 4: Stars ──
     for (let i = 0; i < 30; i++) {
-        const sx = ((i * 137 + 47) % 600) + 20;
+        const sx = ((i * 137 + 47) % (cw - 40)) + 20;
         const sy = ((i * 251 + 89) % (ch * 0.35));
         const size = (i % 3 === 0) ? 2 : 1;
         let alpha = 0.3 + (i * 73 % 50) / 100;
@@ -3501,7 +3806,7 @@ function drawTitleScreen() {
     ctx.fillStyle = darkGrad;
     ctx.fillRect(0, darkStart - ch * 0.12, cw, ch - darkStart + ch * 0.12);
 
-    // ── Layer 9: Touch-first card grid (2x2) at bottom of screen ──
+    // ── Layer 9: Touch-first card grid (2x2 + settings row) at bottom ──
     const dailyDist = DISTRICTS[getDailyDistrictIndex()];
     const dailyDone = gameState.dailyPlayed && !IS_ADMIN;
     const selectedIndex = gameState._menuIndex || 0;
@@ -3510,16 +3815,18 @@ function drawTitleScreen() {
         { icon: '\u26A1',    label: 'QUICK', desc: 'Random district', accent: '#ff8040' },
         { icon: '\u{1F5FA}', label: 'DISTRICTS', desc: 'Select district', accent: '#ffe66d' },
         { icon: '\u{1F4C5}', label: 'DAILY DISTRICT', desc: dailyDone ? 'Completed today!' : dailyDist.name, accent: dailyDone ? '#666' : '#ff6b9d' },
+        { icon: '\u2699',    label: 'SETTINGS', desc: 'Display & fullscreen', accent: '#a0a0c0' },
     ];
 
     const pad = Math.floor(cw * 0.03);
     const gridW = cw - pad * 2;
     const gap = Math.floor(cw * 0.025);
     const cardW = Math.floor((gridW - gap) / 2);
-    const cardH = Math.floor(ch * 0.15);
+    const cardH = Math.floor(ch * 0.13);
+    const settingsCardH = Math.floor(ch * 0.09);
     const footerH = 22;
     const gridBottom = ch - footerH;
-    const gridTop = gridBottom - (cardH * 2 + gap);
+    const gridTop = gridBottom - (cardH * 2 + gap + gap + settingsCardH);
 
     // ── Layer 8: Wordmark logo (centered between top and card grid) ──
     const taglineFontSize = Math.floor(cw * 0.022);
@@ -3553,20 +3860,31 @@ function drawTitleScreen() {
 
     titleCardRects = [];
 
-    for (let i = 0; i < 4; i++) {
-        const col = i % 2;
-        const row = Math.floor(i / 2);
-        const cx = gridLeft + col * (cardW + gap);
-        const cy = gridTop + row * (cardH + gap);
+    for (let i = 0; i < 5; i++) {
+        let cx, cy, cW, cH;
+        if (i < 4) {
+            const col = i % 2;
+            const row = Math.floor(i / 2);
+            cx = gridLeft + col * (cardW + gap);
+            cy = gridTop + row * (cardH + gap);
+            cW = cardW;
+            cH = cardH;
+        } else {
+            // Settings card: full width, 3rd row
+            cx = gridLeft;
+            cy = gridTop + cardH * 2 + gap * 2;
+            cW = gridW;
+            cH = settingsCardH;
+        }
         const item = cardItems[i];
         const selected = i === selectedIndex;
 
-        titleCardRects.push({ x: cx, y: cy, w: cardW, h: cardH, idx: i });
+        titleCardRects.push({ x: cx, y: cy, w: cW, h: cH, idx: i });
 
         // Card press scale animation
         const pressScale = (selected && gameState._cardPressAnim) ? 0.97 : 1.0;
-        const centerX = cx + cardW / 2;
-        const centerY = cy + cardH / 2;
+        const centerX = cx + cW / 2;
+        const centerY = cy + cH / 2;
 
         ctx.save();
         ctx.translate(centerX, centerY);
@@ -3579,14 +3897,14 @@ function drawTitleScreen() {
             ? `rgba(78,205,196,${bgAlpha})`
             : `rgba(255,255,255,${bgAlpha})`;
         ctx.beginPath();
-        ctx.roundRect(cx, cy, cardW, cardH, cornerR);
+        ctx.roundRect(cx, cy, cW, cH, cornerR);
         ctx.fill();
 
         // Card border
         ctx.strokeStyle = selected ? item.accent : 'rgba(255,255,255,0.12)';
         ctx.lineWidth = selected ? 2 : 1;
         ctx.beginPath();
-        ctx.roundRect(cx, cy, cardW, cardH, cornerR);
+        ctx.roundRect(cx, cy, cW, cH, cornerR);
         ctx.stroke();
 
         // Selected glow
@@ -3596,19 +3914,19 @@ function drawTitleScreen() {
             ctx.strokeStyle = item.accent + '60';
             ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.roundRect(cx, cy, cardW, cardH, cornerR);
+            ctx.roundRect(cx, cy, cW, cH, cornerR);
             ctx.stroke();
             ctx.shadowColor = 'transparent';
             ctx.shadowBlur = 0;
         }
 
         // Icon
-        const iconSize = Math.floor(cardH * 0.38);
+        const iconSize = Math.floor(cH * 0.38);
         ctx.font = `${iconSize}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(item.icon, cx + cardW * 0.22, cy + cardH * 0.42);
+        ctx.fillText(item.icon, cx + cW * 0.15, cy + cH * 0.48);
         ctx.textBaseline = 'alphabetic';
 
         // Label
@@ -3616,13 +3934,13 @@ function drawTitleScreen() {
         ctx.fillStyle = selected ? item.accent : '#d0d8e0';
         ctx.font = `bold ${labelSize}px monospace`;
         ctx.textAlign = 'left';
-        ctx.fillText(item.label, cx + cardW * 0.40, cy + cardH * 0.40);
+        ctx.fillText(item.label, cx + cW * 0.28, cy + cH * 0.40);
 
         // Description
         const descSize = Math.floor(cw * 0.018);
         ctx.fillStyle = selected ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.4)';
         ctx.font = `${descSize}px monospace`;
-        ctx.fillText(item.desc, cx + cardW * 0.40, cy + cardH * 0.62);
+        ctx.fillText(item.desc, cx + cW * 0.28, cy + cH * 0.65);
 
         ctx.restore();
     }
@@ -5190,6 +5508,8 @@ function update(dt) {
         updateCharSelect(dt);
     } else if (gameState.screen === 'districtSelect') {
         updateDistrictSelect(dt);
+    } else if (gameState.screen === 'settings') {
+        updateSettings(dt);
     }
 }
 
@@ -5234,28 +5554,41 @@ function titleMenuSelect(idx) {
         charCarousel.offset = (gameState._charIndex || 0) * getCharCardSpacing();
         charCarousel.velocity = 0;
         charCarousel.settled = true;
+    } else if (idx === 4) {
+        // Settings
+        gameState.screen = 'settings';
+        gameState._settingsIndex = 0;
     }
 }
 
 function updateTitleMenu(dt) {
     if (gameState._menuIndex === undefined) gameState._menuIndex = 0;
 
-    // 2x2 grid navigation: up/down moves between rows, left/right between columns
+    // 2x2 grid + settings row navigation
+    // indices 0-3: 2x2 grid, index 4: settings (full-width 3rd row)
     const idx = gameState._menuIndex;
-    const col = idx % 2;
-    const row = Math.floor(idx / 2);
 
-    if (inputActions.up && row > 0) {
-        gameState._menuIndex = (row - 1) * 2 + col;
-    }
-    if (inputActions.down && row < 1) {
-        gameState._menuIndex = (row + 1) * 2 + col;
-    }
-    if (inputActions.left && col > 0) {
-        gameState._menuIndex = row * 2 + (col - 1);
-    }
-    if (inputActions.right && col < 1) {
-        gameState._menuIndex = row * 2 + (col + 1);
+    if (idx < 4) {
+        const col = idx % 2;
+        const row = Math.floor(idx / 2);
+        if (inputActions.up && row > 0) {
+            gameState._menuIndex = (row - 1) * 2 + col;
+        }
+        if (inputActions.down) {
+            if (row < 1) gameState._menuIndex = (row + 1) * 2 + col;
+            else gameState._menuIndex = 4; // go to settings row
+        }
+        if (inputActions.left && col > 0) {
+            gameState._menuIndex = row * 2 + (col - 1);
+        }
+        if (inputActions.right && col < 1) {
+            gameState._menuIndex = row * 2 + (col + 1);
+        }
+    } else {
+        // On settings row
+        if (inputActions.up) gameState._menuIndex = 2; // go back to row 1, left col
+        if (inputActions.left) gameState._menuIndex = 2;
+        if (inputActions.right) gameState._menuIndex = 3;
     }
 
     if (inputActions.confirm) {
@@ -5383,6 +5716,7 @@ function draw() {
     titleCardRects = [];
     pauseMenuRects = [];
     endScreenCardRects = [];
+    settingsItemRects = [];
 
     // Clear
     ctx.fillStyle = COLORS.uiBg;
@@ -5400,6 +5734,11 @@ function draw() {
 
     if (gameState.screen === 'districtSelect') {
         drawDistrictSelectScreen();
+        return;
+    }
+
+    if (gameState.screen === 'settings') {
+        drawSettingsScreen();
         return;
     }
 
@@ -5548,6 +5887,9 @@ function gameLoop(timestamp) {
 // INITIALIZATION
 // ============================================
 function initGame() {
+    // Load saved display settings first
+    loadDisplaySettings();
+
     // Set resolution
     const res = RESOLUTIONS[displaySettings.currentResolution];
     canvas.width = res.width;
@@ -5556,6 +5898,12 @@ function initGame() {
 
     // Keyboard listeners
     document.addEventListener('keydown', (e) => {
+        // F11: toggle fullscreen
+        if (e.code === 'F11') {
+            e.preventDefault();
+            toggleFullscreen();
+            return;
+        }
         if (!e.repeat) {
             keys[e.code] = true;
             keyBuffer[e.code] = true;  // Buffer so fast taps survive to next frame
@@ -5654,6 +6002,22 @@ function initGame() {
                     canvasY >= card.y && canvasY <= card.y + card.h) {
                     gameState._menuIndex = card.idx;
                     titleMenuSelect(card.idx);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Settings: tap items
+        if (screen === 'settings') {
+            for (const rect of settingsItemRects) {
+                if (canvasX >= rect.x && canvasX <= rect.x + rect.w &&
+                    canvasY >= rect.y && canvasY <= rect.y + rect.h) {
+                    gameState._settingsIndex = rect.idx;
+                    if (rect.action === 'fullscreen') toggleFullscreen();
+                    else if (rect.action === 'resolution') cycleResolution(1);
+                    else if (rect.action === 'autodetect') autoDetectResolution();
+                    else if (rect.action === 'back') gameState.screen = 'title';
                     return true;
                 }
             }
@@ -5965,6 +6329,27 @@ function initGame() {
                 c.x >= charConfirmBtnRect.x && c.x <= charConfirmBtnRect.x + charConfirmBtnRect.w &&
                 c.y >= charConfirmBtnRect.y && c.y <= charConfirmBtnRect.y + charConfirmBtnRect.h) {
                 charSelectConfirm();
+            }
+        } else if (gameState.screen === 'settings') {
+            for (const rect of settingsItemRects) {
+                if (c.x >= rect.x && c.x <= rect.x + rect.w &&
+                    c.y >= rect.y && c.y <= rect.y + rect.h) {
+                    gameState._settingsIndex = rect.idx;
+                    if (rect.action === 'fullscreen') toggleFullscreen();
+                    else if (rect.action === 'resolution') cycleResolution(1);
+                    else if (rect.action === 'autodetect') autoDetectResolution();
+                    else if (rect.action === 'back') gameState.screen = 'title';
+                    return;
+                }
+            }
+        } else if (gameState.screen === 'title') {
+            for (const card of titleCardRects) {
+                if (c.x >= card.x && c.x <= card.x + card.w &&
+                    c.y >= card.y && c.y <= card.y + card.h) {
+                    gameState._menuIndex = card.idx;
+                    titleMenuSelect(card.idx);
+                    return;
+                }
             }
         }
     });
